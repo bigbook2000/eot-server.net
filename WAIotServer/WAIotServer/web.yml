@@ -1,0 +1,23 @@
+# Web服务
+web:
+  session_timeout: 900000
+  # 根用户编号，该用户具有全部权限
+  root_id: 1
+  default_password: Asdf@4321
+
+# 数据库
+db:
+  db_string: Server=127.0.0.1;Uid=eongatedb;Pwd=eongatedb@123;Port=3306;Database=eongate;Sslmode=Preferred; 
+  slow_delay: 3000
+
+dbproclist:
+  # 数据接口名称，权限，如果是 none 不计权限
+  np_device_query: none
+  np_device_upd: none
+  np_device_del: none
+  np_config_get: none
+  np_config_set: none
+  np_datafield_list: none
+  np_datafield_upd: none
+  np_datafield_del: none
+  np_data_query: none

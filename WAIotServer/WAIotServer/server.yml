@@ -1,0 +1,17 @@
+﻿server:
+  port: 16902
+  max_recv: 4096
+  max_send: 4096
+  timeout: 200000
+
+package:
+  delay_2011: 5000
+  delay_2051: 10000
+  delay_2061: 8000
+  delay_2031: 15000
+
+# 数据库
+db:
+  db_string: Server=127.0.0.1;Uid=eongatedb;Pwd=eongatedb@123;Port=3306;Database=eongate;Sslmode=Preferred;
+  slow_delay: 3000
+  sql_test: SELECT * FROM `check`
