@@ -2,6 +2,7 @@
 using cn.eobject.iot.Server.Core;
 using cn.eobject.iot.Server.DB;
 using cn.eobject.iot.Server.Log;
+using EOIotServer.protocol;
 using System.Security.Cryptography;
 using System.Text;
 using static Org.BouncyCastle.Math.EC.ECCurve;
@@ -22,13 +23,23 @@ namespace WAIotServer.Logic
         public static string DefaultPassword = "Asdf@4321";
 
 #pragma warning disable CS8618 // 在退出构造函数时，不可为 null 的字段必须包含非 null 值。请考虑声明为可以为 null。
+        
+        /// <summary>
+        /// 数据库对象
+        /// </summary>
         public static cls_mysql IotDB;
+        /// <summary>
+        /// 物联网数据服务
+        /// </summary>
+        public static CServer_HJ212 IotServer;
+
 #pragma warning restore CS8618 // 在退出构造函数时，不可为 null 的字段必须包含非 null 值。请考虑声明为可以为 null。
 
         public static int SessionTimeout = 600000;
         public static int RootId = 1;
 
         public static Dictionary<string, string> DBProcList = new();
+
 
         public CGlobal()
         {
@@ -43,6 +54,9 @@ namespace WAIotServer.Logic
             IotDB = new cls_mysql(
                 get_string_("db/db_string"),
                 get_int32_("db/slow_delay"));
+
+            // 启动一个数据服务
+            IotServer = new CServer_HJ212();
 
             // 初始化数据接口，只有配置的数据接口才能被调用
             LoadDBProcList();

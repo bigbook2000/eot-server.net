@@ -5,6 +5,9 @@ using EOIotServer.common;
 using EOIotServer.protocol.hj212;
 using Google.Protobuf.Collections;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Org.BouncyCastle.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -29,7 +32,15 @@ namespace EOIotServer.protocol
 
         protected cls_server ServerHandler;
 
+        /// <summary>
+        /// 按CN标识处理不同的消息包，分发到不同的线程，提高处理能力
+        /// </summary>
         protected Dictionary<string, CPackageList_HJ212> DicPackageList = new();
+
+        /// <summary>
+        /// 用于处理发送的命令
+        /// </summary>
+        protected List<CPackage_HJ212> ListPackageCommand = new();
 
         protected CDBSql_HJ212 DBSql;
         protected CDeviceManager DeviceManager;
@@ -71,6 +82,7 @@ namespace EOIotServer.protocol
             // 初始化状态管理
             DeviceManager = new(TickTimeout);
 
+            // 默认的消息队列
             DicPackageList.Add(PACKAGE_DEFAULT, new CPackageList_HJ212(PACKAGE_DEFAULT, 0));
 
             long delay;
@@ -95,11 +107,148 @@ namespace EOIotServer.protocol
 
             ServerHandler.start_(config.get_int32_("server/port"));
         }
-        
+
+        /// <summary>
+        /// 发送命令
+        /// </summary>
+        /// <param name="pack"></param>
+        public void SendPackage(CPackage_HJ212 pack)
+        {
+            List<string> keyList = DeviceManager.FindConnects(pack.MN);
+
+            CConnect? connect;
+            byte[] bytes;
+            foreach (string key in keyList)
+            {
+                connect = (CConnect?)ServerHandler.get_connect(key);
+                if (connect == null) continue;
+
+                cls_log.get_default_().T_("", "[" + key + "]>" + pack.PackString);
+
+                bytes = cls_core.str2bytes_(pack.PackString + "\r\n");
+                connect.send_(bytes, 0, bytes.Length);
+            }
+        }
+
+        /// <summary>
+        /// 自定义HJ212命令
+        /// 3101 获取设备参数
+        /// 3102 上传设备参数
+        /// 3103 获取传感器状态
+        /// 3104 控制传感器状态
+        /// 3109 固件更新
+        /// </summary>
+        /// <param name="mn"></param>
+        /// <param name="st"></param>
+        /// <param name="cn"></param>
+        /// <param name="configData"></param>
+        public async Task<string?> SendCommand(string mn, string st, string cn, string configData)
+        {
+            string sMsg;
+
+            try
+            {
+                foreach (CPackage_HJ212 pack in ListPackageCommand)
+                {
+                    if (pack.MN == mn)
+                    {
+                        sMsg = "命令已在队列中 " + mn;
+                        cls_log.get_default_().T_("", sMsg);
+                        return sMsg;
+                    }
+                }
+
+                CPackage_HJ212 packSend = new("");
+                packSend.Encode(mn, st, cn, CPackage_HJ212.PASSWORD_DEFAULT, configData);
+
+                packSend.LastTick = DateTime.Now.Ticks;
+
+                // 加入到队列中            
+                ListPackageCommand.Add(packSend);
+
+                SendPackage(packSend);
+
+                CPackage_HJ212? packRecv = null;
+                // 同步等待
+                for (int i = 0; i < 0x7F; i++)
+                {
+                    await Task.Delay(100);
+                    if (packSend.Tag != null)
+                    {
+                        packRecv = (CPackage_HJ212?)packSend.Tag;
+                        break;
+                    }
+                }
+
+                // 处理之后移除
+                ListPackageCommand.Remove(packSend);
+
+                return packRecv?.ParseCP();
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+
+            return null;
+        }
+
+        private void SendCommandConfigGet(CConnect connect, string mn, string st)
+        {
+            try
+            { 
+                CPackage_HJ212 packSend = new("");
+                packSend.Encode(mn, st, CPackage_HJ212.CN_CONFIG_GET, CPackage_HJ212.PASSWORD_DEFAULT, "");
+
+                cls_log.get_default_().T_("", "[" + connect.get_key_() + "]>" + packSend.PackString);
+
+                byte[] bytes = cls_core.str2bytes_(packSend.PackString + "\r\n");
+                connect.send_(bytes, 0, bytes.Length);
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// 处理其他CN命令消息
+        /// 2011,2021,2031,2041,2051,2061数据包由专门的队列处理，其他的则转到此函数处理
+        /// </summary>
+        /// <param name="list"></param>
+        private void DoPackageDefault(List<CPackage_HJ212> list)
+        {
+            try
+            {
+                foreach (CPackage_HJ212 packRecv in list)
+                {
+                    // 查找对应的发送命令
+                    foreach (CPackage_HJ212 packSend in ListPackageCommand)
+                    {
+                        if (packSend.MN == packRecv.MN && packSend.CN == packRecv.CN)
+                        {
+                            packSend.Tag = packRecv;
+                            break;
+                        }
+                    }
+
+                    // 处理配置信息
+                    if (CPackage_HJ212.CN_CONFIG_GET.Equals(packRecv.CN))
+                    {
+                        DBSql.DBUpdateConfig(packRecv);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
+
         /// <summary>
         /// 状态处理
         /// </summary>
-        public void OnThreadStatus(object? tag)
+        private void OnThreadStatus(object? tag)
 {
             try
             {
@@ -120,7 +269,7 @@ namespace EOIotServer.protocol
         /// <summary>
         /// 实时数据更新线程
         /// </summary>
-        public void OnThreadDataRtUpdate(object? tag)
+        private void OnThreadDataRtUpdate(object? tag)
         {
             try
             {
@@ -135,7 +284,7 @@ namespace EOIotServer.protocol
         /// <summary>
         /// 线程池调度线程
         /// </summary>
-        public void OnThreadPackageTask(object? tag)
+        private void OnThreadPackageTask(object? tag)
         {
             try
             {
@@ -166,7 +315,7 @@ namespace EOIotServer.protocol
         /// 调用线程池将数据存储到数据库中
         /// </summary>
         /// <param name="state"></param>
-        public void OnThreadPackageData(object? state)
+        private void OnThreadPackageData(object? state)
         {
             try
             {
@@ -211,11 +360,14 @@ namespace EOIotServer.protocol
                             {
                                 tconnect.DeviceId = pack.DeviceId;
                                 tconnect.ConnectMN = pack.MN;
+
+                                // 发送命令获取配置参数
+                                SendCommandConfigGet(tconnect, pack.MN, pack.ST);
                             }
 
                             // 进入状态管理
                             DeviceManager.PushConnect(pack.MN, pack.ConnectKey, tick);
-                        }                        
+                        }
                     }
 
                     // 未避免每次都检查数据表，第一次注册时，检查记录是否存在
@@ -252,6 +404,9 @@ namespace EOIotServer.protocol
                     case "2061":
                     case "2031":
                         DBSql.DBInsertHis("n_data_" + listPackage.CN, list);
+                        break;
+                    default:
+                        DoPackageDefault(list);
                         break;
                 }
                 

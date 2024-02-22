@@ -57,6 +57,16 @@ namespace EOIotServer.protocol
             return dic;
         }
 
+        public string GetKeyValueString(Dictionary<string, string> cpList, string key)
+        {
+            if (cpList.ContainsKey(key))
+            {
+                return cpList[key];
+            }
+
+            return "";
+        }
+
         /// <summary>
         /// 查询未建立数据表的记录
         /// </summary>
@@ -83,6 +93,39 @@ namespace EOIotServer.protocol
                     "WHERE `n_device`.`mn` IN(" + mns + ") " +
                     "AND `n_data_rt`.`data_rt_id` is null";
                 exec_update_(sql);
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// 更新配置
+        /// </summary>
+        /// <param name="pack"></param>
+        public void DBUpdateConfig(CPackage_HJ212 pack)
+        {
+            try
+            {
+                StringBuilder sb = new();
+
+                // 先更新设备信息
+                sb.Append("UPDATE `n_device` SET ")
+                    .Append("`dkey`='").Append(GetKeyValueString(pack.CPList, "DKey"))
+                    .Append("',`dtype`='").Append(GetKeyValueString(pack.CPList, "DType"))
+                    .Append("',`dversion`='").Append(GetKeyValueString(pack.CPList, "DVersion"))
+                    .Append("' WHERE `device_id`=").Append(pack.DeviceId);
+
+                sb.Append(";DELETE FROM `n_config` WHERE `device_id`=").Append(pack.DeviceId);
+
+                string? cpStr = pack.ParseCP();
+                if (cpStr == null) cpStr = "";
+                // 再存储配置信息
+                sb.Append(";INSERT INTO `n_config`(`device_id`,`config_data`,`ctime`) VALUES(")
+                    .Append(pack.DeviceId).Append(",'").Append(cpStr).Append("',now());");
+
+                exec_update_(sb.ToString());
             }
             catch (Exception ex)
             {

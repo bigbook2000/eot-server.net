@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EOIotServerLib\EOIotServerLib.csproj" />
-    <ProjectReference Include="..\EOIotServer\EOIotServer.csproj" />
+    <ProjectReference Include="..\EOTServerLib\EOTServerLib.csproj" />
+    <ProjectReference Include="..\EOTServer\EOTServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

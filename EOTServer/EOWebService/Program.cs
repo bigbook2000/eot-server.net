@@ -28,9 +28,6 @@ namespace WAIotServer
             // 创建会话管理
             _ = new eow_session();
 
-            // 启动一个数据服务
-            _ = new CServer_HJ212();
-
             builder.Services.AddCors(
                 options => options.AddPolicy(
                     "CORS",

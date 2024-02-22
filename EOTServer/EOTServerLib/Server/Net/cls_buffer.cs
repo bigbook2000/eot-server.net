@@ -81,7 +81,7 @@ namespace cn.eobject.iot.Server.Net
                 //cls_log.get_default_().T_("", "P[{0}/{1}] {2}", length, _length, cls_core.log_bytes_(_buffer, 0, _length));
             }
 
-            return _length;
+            return length;
         }
 
         public int pop_(int length)

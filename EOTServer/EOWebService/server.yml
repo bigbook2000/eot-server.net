@@ -1,5 +1,5 @@
 ﻿server:
-  port: 16902
+  port: 56909
   max_recv: 4096
   max_send: 4096
   timeout: 200000
@@ -12,6 +12,6 @@ package:
 
 # 数据库
 db:
-  db_string: Server=127.0.0.1;Uid=eongatedb;Pwd=eongatedb@123;Port=3306;Database=eongate;Sslmode=Preferred;
+  db_string: Server=127.0.0.1;Uid=eotgate;Pwd=EOT@Iot2024g;Port=3306;Database=eotgatedb;Sslmode=Preferred; 
   slow_delay: 3000
   sql_test: SELECT * FROM `check`

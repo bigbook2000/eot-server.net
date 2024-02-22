@@ -124,6 +124,12 @@ namespace cn.eobject.iot.Server.Core
             // 需安装引用 System.Text.Encodings.CodePages
             return Encoding.GetEncoding("GB2312").GetString(bytes, index, length);
         }
+        public static byte[] str2bytes_(string str)
+        {
+            // BitConverter.ToString()
+            // 需安装引用 System.Text.Encodings.CodePages
+            return Encoding.GetEncoding("GB2312").GetBytes(str);
+        }
 
         public static string log_bytes_(byte[] bytes, int index, int length)
         {

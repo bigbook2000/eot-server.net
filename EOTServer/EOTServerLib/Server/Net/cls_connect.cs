@@ -168,12 +168,17 @@ namespace cn.eobject.iot.Server.Net
                 int len = _buffer_send.get_length_();
                 if (len <= 0) return;
 
+                if (len > _send_bytes.Length) len = _send_bytes.Length;
+
                 // 取出剩余数据
-                _buffer_send.pop_(_send_bytes, 0, _send_bytes.Length);
+                int ret = _buffer_send.pop_(_send_bytes, 0, len);
+                if (ret <= 0) return;
+
+                cls_log.get_default_().T_("", "[" + get_key_() + "]直接发送 {0} / {1}", ret, len);
 
                 // 继续发送
                 _socket?.BeginSend(
-                    _send_bytes, 0, _send_bytes.Length,
+                    _send_bytes, 0, ret,
                     SocketFlags.None, new AsyncCallback(on_send), this);
             }
             catch (Exception ex)

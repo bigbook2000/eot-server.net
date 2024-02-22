@@ -9,9 +9,43 @@ using System.Threading.Tasks;
 
 namespace EOIotServer.protocol.hj212
 {
+    /// <summary>
+    /// 
+    /// 解析HJ212消息包
+    /// 
+    /// </summary>
     public class CPackage_HJ212
     {
+        /// <summary>
+        /// 最小包长度
+        /// </summary>
         public const int MIN_LENGTH = 12;
+
+        /// <summary>
+        /// 密钥（忽略）
+        /// </summary>
+        public const string PASSWORD_DEFAULT = "123456";
+
+        /// <summary>
+        /// 获取设备参数
+        /// </summary>
+        public const string CN_CONFIG_GET = "3101";
+        /// <summary>
+        /// 上传设备参数
+        /// </summary>
+        public const string CN_CONFIG_SET = "3102";
+        /// <summary>
+        /// 获取传感器状态
+        /// </summary>
+        public const string CN_CONTROL_GET = "3103";
+        /// <summary>
+        /// 控制传感器状态
+        /// </summary>
+        public const string CN_CONTROL_SET = "3104";
+        /// <summary>
+        /// 固件更新
+        /// </summary>
+        public const string CN_BIN_UPDATE = "3109";
 
         public int DeviceId = 0;
 
@@ -38,9 +72,52 @@ namespace EOIotServer.protocol.hj212
         /// </summary>
         public DateTime DataTime = cls_core._date1970;
 
+        /// <summary>
+        /// 时间戳
+        /// </summary>
+        public long LastTick = 0L;
+
+        /// <summary>
+        /// 外挂标识
+        /// </summary>
+        public object? Tag = null;
+
         public CPackage_HJ212(string connectKey) 
         {
             ConnectKey = connectKey;
+        }
+
+        /// <summary>
+        /// HJ212 16位CRC校验码
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string EncodeCRC16(string str)
+        {
+            byte[] bytes = cls_core.str2bytes_(str);
+
+            int i, cnt;
+            
+            int crcReg = 0xFFFF;
+            int check;;
+
+            cnt = bytes.Length;
+            for (i = 0; i < cnt; i++)
+            {
+
+                crcReg = (crcReg >> 8) ^ bytes[i];
+                for (int j = 0; j < 8; j++)
+                {
+                    check = crcReg & 0x0001;
+                    crcReg >>= 1;
+                    if (check == 0x0001)
+                    {
+                        crcReg ^= 0xa001;
+                    }
+                }
+            }
+
+            return crcReg.ToString("X4");
         }
 
         public int GetKeyValue(string sp, out string key, out string val)
@@ -114,6 +191,30 @@ namespace EOIotServer.protocol.hj212
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// 解析CP
+        /// </summary>
+        /// <returns></returns>
+        public string? ParseCP()
+        {
+            int pos = PackString.IndexOf("CP=");
+            if (pos < 6)
+            {
+                cls_log.get_default_().T_("", "[" + ConnectKey + "]数据包错误CP {0}", PackString);
+                return null;
+            }
+
+            // 忽略校验长度和CRC
+            string sp = PackString.Substring(pos + 3, PackString.Length - pos - 7);
+            if (!sp.StartsWith("&&") || !sp.EndsWith("&&"))
+            {
+                cls_log.get_default_().T_("", "[" + ConnectKey + "]数据包错误&& {0}", PackString);
+                return null;
+            }
+
+            return sp.Substring(2, sp.Length - 4);
         }
 
         /// <summary>
@@ -231,6 +332,33 @@ namespace EOIotServer.protocol.hj212
             }
 
             return len;
+        }
+
+        /// <summary>
+        /// 编码
+        /// 不含\r\n换行符
+        /// </summary>
+        /// <param name="mn"></param>
+        /// <param name="st"></param>
+        /// <param name="cn"></param>
+        /// <param name="psw"></param>
+        /// <param name="cp"></param>
+        public string Encode(string mn, string st, string cn, string psw, string cp)
+        {
+            MN = mn;
+            CN = cn;
+            ST = st;
+
+            string dts = DateTime.Now.ToString("yyyyMMddHHmmss");
+            PackString = string.Format(
+                "QN={0}000;ST={1};CN={2};PW={3};MN={4};Flag=5;CP=&&{5}&&",
+                dts, st, cn, psw, mn, cp);
+            string sLen = PackString.Length.ToString("0000");
+            string sCrc = EncodeCRC16(PackString);
+
+            PackString = "##" + sLen + PackString + sCrc;
+
+            return PackString;
         }
     }
 }
