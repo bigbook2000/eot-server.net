@@ -7,14 +7,19 @@
 
 采用.NET Core API实现对终端信息的存储、编辑，状态管理，物联网数据参数实时数据查询，历史数据查询。实现了API访问权限底层架构，以及建立在架构之上的基础框架功能，包括账号、部门、角色、权限、菜单等功能。（前后端分离，依赖于前端Vue3.0界面，请参考另一开源库eot-webui3）
 
+详细信息请关注[wiki文档](https://gitee.com/bigbook2000/eot-server.net/wikis/pages)
+
 #### 软件架构
 目前暂为预览版本，后续进一步完善，使用Microsoft Visual Studio Community 2022，.NET 6.0进行开发
 
-
-#### 安装教程
-
+eot-server.net分为两大模块，EOTServer采用C/S架构，TCP Server为物联网终端提供网络数据采集服务，目前以实现HJ212协议，可进行多协议扩展。另一模块EOTWebService采用B/S架构，Web API为前端管理页面提供功能接口。
 
 #### 使用说明
+代码使用Microsoft Visual Studio Community 2022 (64 位) 个人社区版本（免费）直接打开，无需下载依赖任何第三方库。
+
+数据库使用Oracle MySQL Community Server（开源免费）8.0，推荐官方免费的MySQL Workbench可视化工具，直接导入db/eotgate.sql脚本。
+
+为了和终端兼容，并扩展方便，采用了yml配置文件格式。平台一共使用两个配置文件server.yml和web.yml分别对应C/S模块和B/S模块。
 
 
 #### 参与贡献
