@@ -107,5 +107,39 @@ namespace WAIotServer.Logic
             bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(salt + CGlobal.AppToken + data));
             return Convert.ToHexString(bytes).ToLower();
         }
+
+        /// <summary>
+        /// 分解文件路径和扩展名，
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns>返回固定长度3的字符串数组，分别为路径，文件名，扩展名</returns>
+        public static string[] GetFileInfo(string path)
+        {
+            string[] ss = new string[3];
+            ss[0] = "";
+            ss[1] = path;
+            ss[2] = "";
+
+            int pos1 = path.LastIndexOf('/');
+            int pos2 = path.LastIndexOf('.');
+
+            // .在路径中
+            if (pos1 > pos2) pos2 = -1;
+
+            if (pos1 != -1)
+            {
+                ss[0] = path.Substring(0, pos1);
+                ss[1] = path.Substring(pos1 + 1);
+            }
+
+            if (pos2 != -1)
+            {
+                string s = ss[1];
+                ss[1] = s.Substring(0, pos2);
+                ss[2] = s.Substring(pos2 + 1);
+            }
+
+            return ss;
+        }
     }
 }

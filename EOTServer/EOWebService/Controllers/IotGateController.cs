@@ -1,9 +1,11 @@
 ﻿using cn.eobject.iot.Server.Core;
+using cn.eobject.iot.Server.Log;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using System.Data;
 using System.Runtime.ConstrainedExecution;
+using System.Security.Cryptography;
 using System.Text.Json;
 using WAIotServer.Logic;
 
@@ -13,6 +15,12 @@ namespace WAIotServer.Controllers
     [ApiController]
     public class IotGateController : ControllerBase
     {
+        private readonly IWebHostEnvironment mEnvironment;
+        public IotGateController(IWebHostEnvironment env)
+        {
+            mEnvironment = env;
+        }
+
         [Route("test")]
         [HttpGet, HttpPost]
         public async Task<JsonResult> Test(string info)
@@ -54,7 +62,7 @@ namespace WAIotServer.Controllers
                 { "cn", sCN },
                 { "cp", sRet }
             });
-            cResult.set_success_();                
+            cResult.set_success_();
 
             return new JsonResult(cResult);
         }
