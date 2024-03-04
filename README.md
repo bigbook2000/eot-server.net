@@ -14,6 +14,8 @@
 
 eot-server.net分为两大模块，EOTServer采用C/S架构，TCP Server为物联网终端提供网络数据采集服务，目前以实现HJ212协议，可进行多协议扩展。另一模块EOTWebService采用B/S架构，Web API为前端管理页面提供功能接口。
 
+两大模块既可以用于小型应用合并执行，EOTServer也可独立启动 C/S和B/S分开运行，后面我们会提供分布式大规模弹性多服务器部署方案，可实现百万级终端大数据并发处理。
+
 #### 使用说明
 代码使用Microsoft Visual Studio Community 2022 (64 位) 个人社区版本（免费）直接打开，无需下载依赖任何第三方库。
 
