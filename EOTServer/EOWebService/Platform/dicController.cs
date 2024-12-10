@@ -8,6 +8,10 @@ using WAIotServer.Logic;
 
 namespace WAIotServer.Platform
 {
+    /// <summary>
+    /// 浏览其使用json文件缓存
+    /// 减少服务端传输和数据库压力
+    /// </summary>
     [Route("api/[controller]/[action]")]
     [ApiController]
     public class dicController : ControllerBase
@@ -22,11 +26,13 @@ namespace WAIotServer.Platform
         [HttpPost]
         [eow_permit]
         public JsonResult list(cls_result args)
-        {            
+        {
+            cls_result cResult = new();
+
             cls_result_obj data = args.default_();
-            cls_result cResult = CGlobal.IotDB.call_query_("eopx_dic_list", new()
+            CGlobal.DBScript.script_(cResult, "eopx_dic_list", new()
             {
-                { "v_dic_pid", data.to_int_("dic_pid") },
+                { "v_dic_pid", data.to_int_("f_dic_pid") },
             });
 
             return new JsonResult(cResult);
@@ -34,15 +40,17 @@ namespace WAIotServer.Platform
         [HttpPost]
         public JsonResult upd(cls_result args)
         {
+            cls_result cResult = new();
+
             cls_result_obj data = args.default_();
-            cls_result cResult = CGlobal.IotDB.call_query_("eopx_dic_upd", new()
+             CGlobal.DBScript.script_(cResult, "eopx_dic_upd", new()
             {
-                { "v_dic_id", data.to_int_("dic_id") },
-                { "v_dic_pid", data.to_int_("dic_pid") },
-                { "v_level", data.to_int_("level") },
-                { "v_label", data.to_string_("label") },
-                { "v_value", data.to_string_("value") },
-                { "v_note", data.to_string_("note") },
+                { "v_dic_id", data.to_int_("f_dic_id") },
+                { "v_dic_pid", data.to_int_("f_dic_pid") },
+                { "v_level", data.to_int_("f_level") },
+                { "v_label", data.to_string_("f_label") },
+                { "v_value", data.to_string_("f_value") },
+                { "v_note", data.to_string_("f_note") },
             });
 
             return new JsonResult(cResult);
@@ -50,29 +58,39 @@ namespace WAIotServer.Platform
         [HttpPost]
         public JsonResult del(cls_result args)
         {
+            cls_result cResult = new();
+
             cls_result_obj data = args.default_();
-            cls_result cResult = CGlobal.IotDB.call_query_("eopx_dic_del", new()
+            CGlobal.DBScript.script_(cResult, "eopx_dic_del", new()
             {
-                { "v_dic_id", data.to_int_("dic_id") },
+                { "v_dic_id", data.to_int_("f_dic_id") },
             });
 
             return new JsonResult(cResult);
         }
+        /// <summary>
+        /// 使用json文件，通过浏览器缓存，减少服务端传输和数据库压力
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
         [HttpPost]
         public JsonResult create(cls_result args)
         {
-            cls_result cResult = new ();
+            cls_result cResult = new();
+
             cls_result cQuery;
 
             // 创建一个字典json文件
-            cQuery = CGlobal.IotDB.call_value_("eopx_dic_version", new());
+            cQuery = new();
+            CGlobal.DBScript.script_(cQuery, "eopx_dic_version", new());
             if (!cQuery.is_success_())
             {
                 return new JsonResult(cResult);
             }
             int nVersion = cls_core.o2int_(cQuery.get_scalar());
 
-            cQuery = CGlobal.IotDB.call_query_("eopx_dic_list", new()
+            cQuery = new();
+            CGlobal.DBScript.script_(cQuery, "eopx_dic_list", new()
             {
                 { "v_dic_pid", -1 },
             });

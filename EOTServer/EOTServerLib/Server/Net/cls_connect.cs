@@ -1,5 +1,6 @@
 ﻿using cn.eobject.iot.Server.Core;
 using cn.eobject.iot.Server.Log;
+using Org.BouncyCastle.Ocsp;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -174,7 +175,7 @@ namespace cn.eobject.iot.Server.Net
                 int ret = _buffer_send.pop_(_send_bytes, 0, len);
                 if (ret <= 0) return;
 
-                cls_log.get_default_().T_("", "[" + get_key_() + "]直接发送 {0} / {1}", ret, len);
+                cls_log.get_default_().T_("", "[" + get_key_() + "]发送开始 {0} / {1}", ret, len);
 
                 // 继续发送
                 _socket?.BeginSend(
@@ -211,6 +212,7 @@ namespace cn.eobject.iot.Server.Net
                 result.AsyncWaitHandle.Close();
 
                 count ??= -1;
+                cls_log.get_default_().T_("", "[" + get_key_() + "]发送结束 {0}", count.Value);
 
                 if (count > 0)
                 {

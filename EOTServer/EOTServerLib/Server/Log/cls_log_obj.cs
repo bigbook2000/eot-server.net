@@ -35,6 +35,11 @@ namespace cn.eobject.iot.Server.Log
             _date_count = dateCount;
         }
 
+        public static string fixed_(string s)
+        {
+            return s.Replace("{", "{{").Replace("}", "}}");
+        }
+
         /// <summary>
         /// 只能在此对象中调用，指示的堆栈为该方法上两级
         /// </summary>
@@ -45,7 +50,7 @@ namespace cn.eobject.iot.Server.Log
         private string get_log_string_(string timeString, string format, params object[] args)
         {
             try
-            {
+            {                
                 string sMsg = string.Format(format, args);
 
                 string sClass = "XXXXXX";

@@ -46,7 +46,9 @@ namespace EOIotServer.common
                     cls_log.get_default_().T_("", ex.ToString());
                 }
 
-                Thread.SpinWait(DelayWait);
+                // SpinWait会抢占CPU时间
+                //Thread.SpinWait(DelayWait);
+                Thread.Sleep(DelayWait);
             }
         }
 

@@ -21,21 +21,23 @@ namespace WAIotServer.Platfrom
         private string LoadUserPermits(int userId, string roleIds)
         {
             StringBuilder sb = new ();
-            cls_result cQuery;
+            cls_result cQuery = new();
+
+            // 角色不能为空
+            if (roleIds.Length == 0) return "";
 
             // 获取权限
-
             string perimtIds = "";
             if (CGlobal.RootId != userId)
             {
-                cQuery = CGlobal.IotDB.call_query_("eopx_user_permits", new()
+                CGlobal.DBScript.script_(cQuery, "eopx_user_permits", new()
                 {
                     { "v_role_ids", roleIds }
                 });
 
                 foreach (cls_result_obj d in cQuery._list)
                 {
-                    string sp = d.to_string_("permits");
+                    string sp = d.to_string_("f_permits");
                     sb.Append(',').Append(sp);
                 }
 
@@ -58,9 +60,12 @@ namespace WAIotServer.Platfrom
 
                     perimtIds = sb.ToString();
                 }
+
+                // 如果是普通用户不允许为空
+                if (perimtIds.Length == 0) return "";
             }
 
-            cQuery = CGlobal.IotDB.call_query_("eopx_permit_list", new()
+            CGlobal.DBScript.script_(cQuery, "eopx_permit_list", new()
             {
                 { "v_permit_ids", perimtIds }
             });
@@ -70,7 +75,7 @@ namespace WAIotServer.Platfrom
             sb.Append(',');
             foreach (cls_result_obj d in cQuery._list)
             {
-                sb.Append(d.to_string_("name")).Append(',');
+                sb.Append(d.to_string_("f_name")).Append(',');
             }
                 
             return sb.ToString();
@@ -96,25 +101,25 @@ namespace WAIotServer.Platfrom
                 // __EOApp@2023#
                 // root!__EOService@2023*594f803b380a41396ed63dca39503542
                 // 5bea4ce7453e8f8237129cb4e0fd7d1a
-                cResult = CGlobal.IotDB.call_query_("eopx_user_check", new()
+                CGlobal.DBScript.script_(cResult, "eopx_user_check", new()
                 {
                     { "v_login_id",  loginId },
                     { "v_login_psw", loginPsw }
                 });
-
                 if (!cResult.is_success_()) return new JsonResult(cResult);
 
                 // 需要校验部门是否存在
 
                 cls_result_obj userData = cResult.default_();
-                int userId = userData.to_int_("user_id");
+                int userId = userData.to_int_("f_user_id");
+                int deptId = userData.to_int_("f_dept_id");
 
                 eow_session_item sessionItem =
-                    eow_session.handle_().create_(userId, userData, CGlobal.SessionTimeout);
+                    eow_session.handle_().create_(userId, deptId, userData, CGlobal.SessionTimeout);
                 cResult.set_token_(sessionItem._session_id);
 
-                string permits = LoadUserPermits(userId, userData.to_string_("role"));
-                userData.Add("permits", permits);
+                string permits = LoadUserPermits(userId, userData.to_string_("f_role"));
+                userData.Add("f_permits", permits);
             }
             catch (Exception ex)
             {
@@ -148,9 +153,9 @@ namespace WAIotServer.Platfrom
                     return new JsonResult(cResult);
                 }
 
-                cResult = CGlobal.IotDB.call_query_("eopx_user_query", new()
+                CGlobal.DBScript.script_(cResult, "eopx_user_query", new()
                 {
-                    { "v_user_id", sessionItem._user_id },
+                    { "v_dept_id", sessionItem._dept_id },
                     { "v_login_id", data.to_string_("login_id") },
                     { "v_name", data.to_string_("name") },
                     { "v_phone", data.to_string_("phone") },
@@ -180,42 +185,35 @@ namespace WAIotServer.Platfrom
             {
                 cls_result_obj data = args.default_();
 
-                int userId = data.to_int_("user_id");
+                int userId = data.to_int_("f_user_id");
                 if (userId == CGlobal.RootId)
                 {
                     cResult.set_error_("无法修改根用户");
                     return new JsonResult(cResult);
                 }
 
-                string loginId = data.to_string_("login_id");
+                string loginId = data.to_string_("f_login_id");
                 string loginPsw = "";
-                string cardId = "";
 
                 if (userId <= 0)
                 {
                     loginPsw = CGlobal.EncryptPassword(CGlobal.DefaultPassword, loginId, true);
                 }
 
-                cResult = CGlobal.IotDB.call_query_("eopx_user_upd", new()
+                CGlobal.DBScript.script_(cResult, "eopx_user_upd", new()
                 {
                     { "v_user_id", userId },
                     { "v_login_id", loginId },
                     { "v_login_psw", loginPsw },
-                    { "v_name", data.to_string_("name") },
-                    { "v_dept_id", data.to_int_("dept_id") },
-                    { "v_role", data.to_string_("role") },
-                    { "v_sex", data.to_string_("sex") },
-                    { "v_birthday", data.to_string_("birthday") },
-                    { "v_phone", data.to_string_("phone") },
-                    { "v_bphone", data.to_string_("bphone") },
-                    { "v_weixin", data.to_string_("weixin") },
-                    { "v_cardid", cardId },
-                    { "v_register", data.to_string_("register") },
-                    { "v_location", data.to_string_("location") },
-                    { "v_entrytime", data.to_string_("entrytime") },
-                    { "v_leavetime", data.to_string_("leavetime") },
-                    { "v_status", data.to_int_("status") },
-                    { "v_note", data.to_string_("note") },
+                    { "v_name", data.to_string_("f_name") },
+                    { "v_dept_id", data.to_int_("f_dept_id") },
+                    { "v_role", data.to_string_("f_role") },
+                    { "v_sex", data.to_string_("f_sex") },
+                    { "v_phone", data.to_string_("f_phone") },                    
+                    { "v_location", data.to_string_("f_location") },
+                    { "v_status", data.to_int_("f_status") },
+                    { "v_note", data.to_string_("f_note") },
+                    { "v_data_ex", data.to_string_("f_data_ex") },
                 });
             }
             catch (Exception ex)
@@ -256,7 +254,7 @@ namespace WAIotServer.Platfrom
                     return new JsonResult(cResult);
                 }
 
-                cResult = CGlobal.IotDB.call_query_("eopx_user_del", new()
+                CGlobal.DBScript.script_(cResult, "eopx_user_del", new()
                 {
                     { "v_user_id", data.to_int_("user_id") },
                 });
@@ -312,7 +310,7 @@ namespace WAIotServer.Platfrom
                 loginPswOld = CGlobal.EncryptPassword(loginPswOld, loginId, false);
                 loginPswNew = CGlobal.EncryptPassword(loginPswNew, loginId, false);
 
-                cResult = CGlobal.IotDB.call_query_("eopx_user_password", new()
+                cResult = CGlobal.DBScript.call_query_("eopx_user_password", new()
                 {
                     { "v_user_id", userId },
                     { "v_login_psw_old", loginPswOld },
@@ -354,7 +352,7 @@ namespace WAIotServer.Platfrom
 
                 string loginPswNew = CGlobal.EncryptPassword(CGlobal.DefaultPassword, loginId, false);
 
-                cResult = CGlobal.IotDB.call_query_("eopx_user_password", new()
+                cResult = CGlobal.DBScript.call_query_("eopx_user_password", new()
                 {
                     { "v_user_id", userId },
                     { "v_login_psw_old", "" },

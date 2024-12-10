@@ -15,6 +15,11 @@ namespace WAIotServer.Platform
     public class deptController : ControllerBase
     {
         /// <summary>
+        /// 最大8个层级，避免无限递归调用
+        /// </summary>
+        private const int MAX_LEVEL = 8;
+
+        /// <summary>
         /// 增加部门索引
         /// </summary>
         /// <param name="deptId"></param>
@@ -22,18 +27,29 @@ namespace WAIotServer.Platform
         private void AddDeptIndex(int deptId, int parentId)
         {
             // 更新索引，只需将父节点的索引都添加到新加的节点即可
-            cls_result cQuery = CGlobal.IotDB.exec_query_(
-                "SELECT * FROM `eox_dept_index` WHERE `dept_id`=" + parentId);
+            cls_result cQuery = new();
+
+            // 向上查找所有关联该节点的父节点
+            CGlobal.DBScript.script_(cQuery, "eopx_dept_index_list_up", new()
+            {
+                { "v_dept_id", parentId }
+            });
 
             // 自己也要加入索引
-            _ = CGlobal.IotDB.exec_update_(
-                "INSERT INTO `eox_dept_index`(`dept_id`,`dept_pid`) VALUES(" + deptId + "," + deptId + ")");
+            CGlobal.DBScript.script_(new cls_result(), "eopx_dept_index_add", new()
+            {
+                { "v_dept_id", deptId },
+                { "v_dept_pid", deptId }
+            });
 
             foreach (cls_result_obj d in cQuery._list)
             {
-                parentId = d.to_int_("dept_pid");
-                _ = CGlobal.IotDB.exec_update_(
-                    "INSERT INTO `eox_dept_index`(`dept_id`,`dept_pid`) VALUES(" + deptId + "," + parentId + ")");
+                parentId = d.to_int_("f_dept_pid");
+                CGlobal.DBScript.script_(new cls_result(), "eopx_dept_index_add", new()
+                {
+                    { "v_dept_id", deptId },
+                    { "v_dept_pid", parentId }
+                });
             }
         }
 
@@ -41,9 +57,11 @@ namespace WAIotServer.Platform
         public JsonResult list(cls_result args)
         {
             cls_result_obj data = args.default_();
-            cls_result cResult = CGlobal.IotDB.call_query_("eopx_dept_list", new()
+            cls_result cResult = new();
+            
+            CGlobal.DBScript.script_(cResult, "eopx_dept_list", new()
             {
-                { "v_dept_pid", data.to_int_("dept_pid") },
+                { "v_dept_pid", data.to_int_("f_dept_pid") },
             });
 
             return new JsonResult(cResult);
@@ -57,20 +75,20 @@ namespace WAIotServer.Platform
             try
             {
                 cls_result_obj data = args.default_();
-                int deptId = data.to_int_("dept_id");
-                int deptPid = data.to_int_("dept_pid");
+                int deptId = data.to_int_("f_dept_id");
+                int deptPid = data.to_int_("f_dept_pid");
 
-                cResult = CGlobal.IotDB.call_query_("eopx_dept_upd", new()
+                CGlobal.DBScript.script_(cResult, "eopx_dept_upd", new()
                 {
                     { "v_dept_id", deptId },
                     { "v_dept_pid", deptPid },
-                    { "v_level", data.to_int_("level") },
-                    { "v_name", data.to_string_("name") },
-                    { "v_address", data.to_string_("address") },
-                    { "v_contact", data.to_string_("contact") },
-                    { "v_phone", data.to_string_("phone") },
-                    { "v_note", data.to_string_("note") },
-                    { "v_status", data.to_int_("status") },
+                    { "v_level", data.to_int_("f_level") },
+                    { "v_name", data.to_string_("f_name") },                    
+                    { "v_contact", data.to_string_("f_contact") },
+                    { "v_phone", data.to_string_("f_phone") },
+                    { "v_note", data.to_string_("f_note") },
+                    { "v_status", data.to_int_("f_status") },
+                    { "v_data_ex", data.to_string_("f_data_ex") },
                 });
 
                 if (!cResult.is_success_())
@@ -81,7 +99,7 @@ namespace WAIotServer.Platform
                 if (deptId <= 0)
                 {
                     // 新增
-                    deptId = cResult.default_().to_int_("dept_id");
+                    deptId = cResult.default_().to_int_("f_dept_id");
                     if (deptId > 0)
                     {
                         AddDeptIndex(deptId, deptPid);
@@ -105,24 +123,32 @@ namespace WAIotServer.Platform
             try
             {
                 cls_result_obj data = args.default_();
-                int deptId = data.to_int_("dept_id");
+                int deptId = data.to_int_("f_dept_id");
 
-                cls_result cQuery = CGlobal.IotDB.exec_query_(
-                    "SELECT * FROM `eox_dept_index` WHERE `dept_pid`=" + deptId);
+                cls_result cQuery = new();
 
+                // 先向上查找节点
+                CGlobal.DBScript.script_(cQuery, "eopx_dept_index_list_up", new()
+                {
+                    { "v_dept_id", deptId }
+                });
+
+                // 将上级节点下所有关联的该节点都移除
                 foreach (cls_result_obj d in cQuery._list)
                 {
-                    deptId = d.to_int_("dept_id");
+                    deptId = d.to_int_("f_dept_id");
 
                     // 移除节点
-                    _ = CGlobal.IotDB.call_query_("eopx_dept_del", new()
+                    CGlobal.DBScript.script_(new cls_result(), "eopx_dept_del", new()
                     {
                         { "v_dept_id", deptId },
                     });
 
                     // 移除节点下所有的索引
-                    _ = CGlobal.IotDB.exec_update_(
-                        "DELETE FROM `eox_dept_index` WHERE `dept_id`=" + deptId + " OR `dept_pid`=" + deptId);
+                    CGlobal.DBScript.script_(new cls_result(), "eox_dept_index_del", new()
+                    {
+                        { "v_dept_id", deptId },
+                    });
                 }
 
                 cResult.set_success_();
@@ -149,28 +175,35 @@ namespace WAIotServer.Platform
             try
             {
                 cls_result_obj data = args.default_();
-                int deptId = data.to_int_("dept_id");
-                //int parentIdOld = data.to_int_("dept_pid_old");
-                int parentIdNew = data.to_int_("dept_pid_new");
+                int deptId = data.to_int_("f_dept_id");
+                //int parentIdOld = data.to_int_("f_dept_pid_old");
+                int parentIdNew = data.to_int_("f_dept_pid_new");
 
-                cls_result cQuery = CGlobal.IotDB.exec_query_(
-                    "SELECT * FROM `eox_dept_index` WHERE `dept_id`=" + parentIdNew + " AND `dept_pid`=" + deptId);
+                cls_result cQuery = new();
+                CGlobal.DBScript.script_(cQuery, "eopx_dept_index_check", new()
+                {
+                    { "v_parent_id_new", parentIdNew },
+                    { "v_dept_pid", deptId },
+                });
+
                 if (cQuery._list.Any())
                 {
                     cResult.set_error_("无法移动到子节点");
                     return new JsonResult(cResult);
                 }
 
-                cResult = CGlobal.IotDB.call_query_("eopx_dept_parent", new()
+                CGlobal.DBScript.script_(cResult, "eopx_dept_parent", new()
                 {
                     { "v_dept_id", deptId },
                     { "v_dept_pid", parentIdNew },
-                    { "v_level", data.to_int_("level") },
+                    { "v_level", data.to_int_("f_level") },
                 });
 
                 // 删除旧索引，仅仅向上删除
-                _ = CGlobal.IotDB.exec_update_(
-                    "DELETE FROM `eox_dept_index` WHERE `dept_id`=" + deptId);
+                CGlobal.DBScript.script_(new cls_result(), "eopx_dept_index_del_up", new()
+                {
+                    { "v_dept_id", deptId }
+                });
 
                 // 添加节点
                 AddDeptIndex(deptId, parentIdNew);
@@ -196,7 +229,8 @@ namespace WAIotServer.Platform
 
             try
             {
-                cls_result cQuery = CGlobal.IotDB.call_query_("eopx_dept_list", new()
+                cls_result cQuery = new();
+                CGlobal.DBScript.script_(cQuery, "eopx_dept_list", new()
                 {
                     { "v_dept_pid", 0 },
                 });
@@ -216,7 +250,7 @@ namespace WAIotServer.Platform
                 {
                     foreach (cls_result_obj d2 in cQuery._list)
                     {
-                        if (d1.to_int_("dept_pid") == d2.to_int_("dept_id"))
+                        if (d1.to_int_("f_dept_pid") == d2.to_int_("f_dept_id"))
                         {
                             d1["parent"] = d2;
 
@@ -237,27 +271,34 @@ namespace WAIotServer.Platform
                 }
 
                 // 删除全部索引
-                _ = CGlobal.IotDB.exec_update_(
-                    "DELETE FROM `eox_dept_index` WHERE `dept_index_id`>0");
+                CGlobal.DBScript.script_(new cls_result(), "eopx_dept_index_clear", new());
 
                 int i;
                 int deptId, deptPid;
                 cls_result_obj? dp;
                 foreach (cls_result_obj d1 in cQuery._list)
                 {
-                    deptId = d1.to_int_("dept_id");
-                    _ = CGlobal.IotDB.exec_update_(
-                        "INSERT INTO `eox_dept_index`(`dept_id`,`dept_pid`) VALUES(" + deptId + "," + deptId + ")");
+                    deptId = d1.to_int_("f_dept_id");
+
+                    // 插入自己
+                    CGlobal.DBScript.script_(new cls_result(), "eopx_dept_index_add", new()
+                    {
+                        { "v_dept_id", deptId },
+                        { "v_dept_pid", deptId }
+                    });
 
                     dp = d1;
-                    for (i = 0; i < 8; i++)
+                    for (i = 0; i < MAX_LEVEL; i++)
                     {
                         dp = (cls_result_obj?)dp["parent"];
                         if (dp == null) break;
 
-                        deptPid = dp.to_int_("dept_id");
-                        _ = CGlobal.IotDB.exec_update_(
-                            "INSERT INTO `eox_dept_index`(`dept_id`,`dept_pid`) VALUES(" + deptId + "," + deptPid + ")");
+                        deptPid = dp.to_int_("f_dept_id");
+                        CGlobal.DBScript.script_(new cls_result(), "eopx_dept_index_add", new()
+                        {
+                            { "v_dept_id", deptId },
+                            { "v_dept_pid", deptPid }
+                        });
                     }
                 }
 

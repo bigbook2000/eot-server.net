@@ -5,7 +5,6 @@ using cn.eobject.iot.Server.Log;
 using EOIotServer.protocol;
 using System.Security.Cryptography;
 using System.Text;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace WAIotServer.Logic
 {
@@ -27,7 +26,7 @@ namespace WAIotServer.Logic
         /// <summary>
         /// 数据库对象
         /// </summary>
-        public static cls_mysql IotDB;
+        public static cls_eotsql DBScript;
         /// <summary>
         /// 物联网数据服务
         /// </summary>
@@ -51,9 +50,9 @@ namespace WAIotServer.Logic
             RootId = get_int32_("web/root_id");
             DefaultPassword = get_string_("web/default_password");
 
-            IotDB = new cls_mysql(
-                get_string_("db/db_string"),
-                get_int32_("db/slow_delay"));
+            DBScript = new(get_int32_("db/slow_delay"));
+            DBScript.load_(cls_core.base_path_(get_string_("db/sql_path")));
+            DBScript.add_db_(get_string_("db/name"), get_string_("db/db_string"));
 
             // 启动一个数据服务
             IotServer = new CServer_HJ212();

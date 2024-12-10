@@ -12,6 +12,8 @@ package:
 
 # 数据库
 db:
+  name: eotgate
   db_string: Server=127.0.0.1;Uid=eotgate;Pwd=EOT@Iot2024g;Port=3306;Database=eotgatedb;Sslmode=Preferred; 
   slow_delay: 3000
-  sql_test: SELECT * FROM `check`
+  sql_path: /sql
+  sql_test: SELECT * FROM tcheck

@@ -85,6 +85,12 @@ namespace cn.eobject.iot.Server.Core
             if (_list.Count <= 0) return new();
             return _list[0];
         }
+
+        public int count_()
+        {
+            return _list.Count;
+        }
+
         public bool is_success_()
         {
             return (_d == RESULT_SUCCESS);
@@ -142,6 +148,14 @@ namespace cn.eobject.iot.Server.Core
         public void add_(cls_result_obj obj)
         {
             _list.Add(obj);
+        }
+
+        public void reset_()
+        {
+            _d = RESULT_SUCCESS;
+            _s = "";
+
+            _list.Clear();
         }
     }
 }

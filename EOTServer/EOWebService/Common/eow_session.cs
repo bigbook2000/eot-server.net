@@ -43,7 +43,7 @@ namespace WAIotServer.Common
             _ = new Timer(new TimerCallback(on_timer_check), null, 0, TIMER_CHECK_DELAY);
         }
 
-        public eow_session_item create_(int userId, object userData, int delayMs)
+        public eow_session_item create_(int userId, int deptId, object userData, int delayMs)
         {
             Random rnd = new ();
             byte[] bytes = new byte[SESSION_CODE_LENGTH];
@@ -59,6 +59,7 @@ namespace WAIotServer.Common
             {
                 _session_id = code,
                 _user_id = userId,
+                _dept_id = deptId,
                 _user_data = userData,
                 _tick_create = DateTime.Now.Ticks,
                 _tick_update = DateTime.Now.Ticks,

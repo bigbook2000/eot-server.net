@@ -1,8 +1,5 @@
 using cn.eobject.iot.Server.Core;
 using cn.eobject.iot.Server.Log;
-using EOIotServer;
-using EOIotServer.protocol;
-using Microsoft.AspNetCore.Mvc;
 using WAIotServer.Common;
 using WAIotServer.Logic;
 
@@ -23,7 +20,11 @@ namespace WAIotServer
             cls_log.get_default_().T_("", "================ ================");
             cls_log.get_default_().T_("", "Web启动");
 
-            CGlobal global = new CGlobal();
+            CGlobal global = new();
+
+            //string s = $"return \"a\"+1;";
+            //var script = CSharpScript.Create(s);
+            //var ret = script.RunAsync();
 
             // 创建会话管理
             _ = new eow_session();

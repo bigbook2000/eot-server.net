@@ -55,7 +55,7 @@ namespace WAIotServer.Common
             {
                 // 检查权限，登录时设定
                 cls_result_obj userData = (cls_result_obj) sessionItem._user_data;
-                string permits = userData.to_string_("permits");
+                string permits = userData.to_string_("f_permits");
 
                 if (!permits.Contains("," + Value + ","))
                 {

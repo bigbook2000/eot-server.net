@@ -13,6 +13,11 @@
         public int _user_id = 0;
 
         /// <summary>
+        /// 部门编号
+        /// </summary>
+        public int _dept_id = 0;
+
+        /// <summary>
         /// 用户挂载数据
         /// </summary>
         public object? _user_data;

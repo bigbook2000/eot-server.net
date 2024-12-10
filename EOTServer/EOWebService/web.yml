@@ -7,8 +7,11 @@ web:
 
 # 数据库
 db:
+  name: eotgate
   db_string: Server=127.0.0.1;Uid=eotgate;Pwd=EOT@Iot2024g;Port=3306;Database=eotgatedb;Sslmode=Preferred;
   slow_delay: 3000
+  sql_path: /DBScript
+  sql_test: SELECT * FROM tcheck
 
 dbproclist:
   # 数据接口名称，权限，如果是 none 不计权限

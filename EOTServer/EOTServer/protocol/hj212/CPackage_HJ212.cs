@@ -27,13 +27,18 @@ namespace EOIotServer.protocol.hj212
         public const string PASSWORD_DEFAULT = "123456";
 
         /// <summary>
+        /// 设备上传唯一标识（注册）
+        /// </summary>
+        public const string CN_DEVICE_KEY = "3019";
+        /// <summary>
         /// 获取设备参数
         /// </summary>
-        public const string CN_CONFIG_GET = "3101";
+        public const string CN_CONFIG_GET = "3020";
         /// <summary>
         /// 上传设备参数
         /// </summary>
-        public const string CN_CONFIG_SET = "3102";
+        public const string CN_CONFIG_SET = "3021";
+
         /// <summary>
         /// 获取传感器状态
         /// </summary>
@@ -45,7 +50,11 @@ namespace EOIotServer.protocol.hj212
         /// <summary>
         /// 固件更新
         /// </summary>
-        public const string CN_BIN_UPDATE = "3109";
+        public const string CN_BIN_UPDATE = "3111";
+        /// <summary>
+        /// 固件更新
+        /// </summary>
+        public const string CN_CFG_UPDATE = "3112";
 
         public int DeviceId = 0;
 
@@ -359,6 +368,28 @@ namespace EOIotServer.protocol.hj212
             PackString = "##" + sLen + PackString + sCrc;
 
             return PackString;
+        }
+
+        public string GetCPString(string key)
+        {
+            if (this.CPList.ContainsKey(key))
+            {
+                return this.CPList[key];
+            }
+
+            return "";
+        }
+        public int GetCPInt32(string key)
+        {
+            if (this.CPList.ContainsKey(key))
+            {
+                if (int.TryParse(this.CPList[key], out int val))
+                {
+                    return val;
+                }                
+            }
+
+            return 0;
         }
     }
 }

@@ -39,8 +39,10 @@ namespace EOIotServer.protocol
 
         /// <summary>
         /// 用于处理发送的命令
+        /// 串行处理，即每次只有一个MN对应的设备可以发送命令
+        /// 需要处理超时
         /// </summary>
-        protected List<CPackage_HJ212> ListPackageCommand = new();
+        protected Dictionary<string, CPackage_HJ212> DicPackageCommand = new();
 
         protected CDBSql_HJ212 DBSql;
         protected CDeviceManager DeviceManager;
@@ -75,9 +77,12 @@ namespace EOIotServer.protocol
 
             // 初始化数据库
             DBSql = new(
-                config.get_string_("db/db_string"),
                 config.get_int32_("db/slow_delay"),
                 config.get_string_("db/sql_test"));
+            DBSql.load_(cls_core.base_path_(config.get_string_("db/sql_path")));
+            DBSql.add_db_(
+                config.get_string_("db/name"),
+                config.get_string_("db/db_string"));
 
             // 初始化状态管理
             DeviceManager = new(TickTimeout);
@@ -109,24 +114,121 @@ namespace EOIotServer.protocol
         }
 
         /// <summary>
+        /// 发送数据
+        /// </summary>
+        /// <param name="mn"></param>
+        /// <param name="bytes"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <param name="info">日志</param>
+        public void SendData(string mn, byte[] bytes, int offset, int count, string info)
+        {
+            try
+            {
+                // 同一个设备编号可能存在多个连接，每个都发送
+                List<string> keyList = DeviceManager.FindConnects(mn);
+
+                int nCount = 0;
+                CConnect? connect;
+                foreach (string key in keyList)
+                {
+                    connect = (CConnect?)ServerHandler.get_connect(key);
+                    if (connect == null) continue;
+
+                    cls_log.get_default_().T_("", "[" + key + "]>" + info);
+                    connect.send_(bytes, offset, count);
+
+                    nCount++;
+                }
+
+                if (nCount == 0)
+                {
+                    cls_log.get_default_().T_("", "未找到对应的设备 " + mn);
+                }
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
+
+        /// <summary>
         /// 发送命令
         /// </summary>
         /// <param name="pack"></param>
         public void SendPackage(CPackage_HJ212 pack)
         {
-            List<string> keyList = DeviceManager.FindConnects(pack.MN);
-
-            CConnect? connect;
-            byte[] bytes;
-            foreach (string key in keyList)
+            try
             {
-                connect = (CConnect?)ServerHandler.get_connect(key);
-                if (connect == null) continue;
+                byte[] bytes = cls_core.str2bytes_(pack.PackString + "\r\n");
+                SendData(pack.MN, bytes, 0, bytes.Length, pack.PackString);
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
 
-                cls_log.get_default_().T_("", "[" + key + "]>" + pack.PackString);
 
-                bytes = cls_core.str2bytes_(pack.PackString + "\r\n");
-                connect.send_(bytes, 0, bytes.Length);
+        /// <summary>
+        /// 判断串行控制指令是否正在进行
+        /// </summary>
+        /// <param name="packSend"></param>
+        /// <returns></returns>
+        private bool CheckCommandPackage(CPackage_HJ212 packSend)
+        {
+            try
+            {
+                lock (DicPackageCommand)
+                {
+                    if (DicPackageCommand.ContainsKey(packSend.MN))
+                    {
+                        CPackage_HJ212 pack = DicPackageCommand[packSend.MN];
+                        long dt = (DateTime.Now.Ticks - pack.LastTick) / 10000;
+                        if (dt > 60000)
+                        {
+                            // 超过60秒移除旧的
+                            DicPackageCommand.Remove(packSend.MN);
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
+
+                    // 加入到队列中            
+                    DicPackageCommand.Add(packSend.MN, packSend);
+                }
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+
+            return false;
+        }
+
+        private void SetCommandRecv(CPackage_HJ212 packRecv)
+        {
+            try
+            {
+                lock (DicPackageCommand)
+                {
+                    if (!DicPackageCommand.ContainsKey(packRecv.MN)) return;
+
+                    // 查找对应的发送命令
+                    CPackage_HJ212 packSend = DicPackageCommand[packRecv.MN];
+                    if (packSend.CN == packRecv.CN)
+                    {
+                        packSend.Tag = packRecv;
+                    }
+
+                    DicPackageCommand.Remove(packRecv.MN);
+                }
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
             }
         }
 
@@ -148,23 +250,16 @@ namespace EOIotServer.protocol
 
             try
             {
-                foreach (CPackage_HJ212 pack in ListPackageCommand)
-                {
-                    if (pack.MN == mn)
-                    {
-                        sMsg = "命令已在队列中 " + mn;
-                        cls_log.get_default_().T_("", sMsg);
-                        return sMsg;
-                    }
-                }
-
                 CPackage_HJ212 packSend = new("");
                 packSend.Encode(mn, st, cn, CPackage_HJ212.PASSWORD_DEFAULT, configData);
-
                 packSend.LastTick = DateTime.Now.Ticks;
 
-                // 加入到队列中            
-                ListPackageCommand.Add(packSend);
+                if (CheckCommandPackage(packSend))
+                {
+                    sMsg = "命令已在队列中 " + mn + ", cn=" + cn;
+                    cls_log.get_default_().T_("", sMsg);
+                    return sMsg;
+                }
 
                 SendPackage(packSend);
 
@@ -180,14 +275,76 @@ namespace EOIotServer.protocol
                     }
                 }
 
-                // 处理之后移除
-                ListPackageCommand.Remove(packSend);
-
                 return packRecv?.ParseCP();
             }
             catch (Exception ex)
             {
                 cls_log.get_default_().T_("", ex.ToString());
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 升级设备版本
+        /// </summary>
+        /// <param name="mn">设备编号</param>
+        /// <param name="type">类型</param>
+        /// <param name="version">版本</param>
+        /// <param name="total">文件大小</param>
+        /// <param name="crc">校验码</param>
+        /// <param name="url">文件地址（远程）</param>
+        /// <returns></returns>
+        public async Task<string?> SendVersionUpdate(string mn, string type, string version, int total, string crc, string url)
+        {
+            string sMsg;
+
+            try
+            {
+                CPackage_HJ212 packSend = new("");
+                string updateInfo = "UType=" + type +
+                    ";UVersion=" + version +
+                    ";UTotal=" + total +
+                    ";UCrc=" + crc;
+                packSend.Encode(mn, "00", CPackage_HJ212.CN_BIN_UPDATE, CPackage_HJ212.PASSWORD_DEFAULT, updateInfo);
+                packSend.LastTick = DateTime.Now.Ticks;
+
+                if (CheckCommandPackage(packSend))
+                {
+                    sMsg = "升级命令已在队列中 " + mn;
+                    cls_log.get_default_().T_("", sMsg);
+                    return sMsg;
+                }
+
+                string dirs = cls_core.base_path_("cache/update");
+                Directory.CreateDirectory(dirs);
+
+                // 下载到缓存，web和server分离时
+                string file = dirs + "/" + crc + ".bin";
+                FileInfo fi = new(file);
+                if (!fi.Exists)
+                {                    
+                    using HttpClient httpClient = new();
+                    var response = await httpClient.GetAsync(url);
+                    if (response == null || !response.IsSuccessStatusCode)
+                    {
+                        sMsg = "版本文件不存在 " + url;
+                        cls_log.get_default_().T_("", sMsg);
+                        return sMsg;
+                    }
+
+                    using var fs = File.Create(file);
+                    await response.Content.CopyToAsync(fs);
+                    fs.Close();
+                    fs.Dispose();
+                }
+
+                SendPackage(packSend);
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+                return ex.ToString();
             }
 
             return null;
@@ -222,22 +379,95 @@ namespace EOIotServer.protocol
             {
                 foreach (CPackage_HJ212 packRecv in list)
                 {
-                    // 查找对应的发送命令
-                    foreach (CPackage_HJ212 packSend in ListPackageCommand)
-                    {
-                        if (packSend.MN == packRecv.MN && packSend.CN == packRecv.CN)
-                        {
-                            packSend.Tag = packRecv;
-                            break;
-                        }
-                    }
+                    SetCommandRecv(packRecv);
 
-                    // 处理配置信息
-                    if (CPackage_HJ212.CN_CONFIG_GET.Equals(packRecv.CN))
+                    switch (packRecv.CN)
                     {
-                        DBSql.DBUpdateConfig(packRecv);
+                        // 处理配置信息
+                        case CPackage_HJ212.CN_CONFIG_GET:
+                            DBSql.DBUpdateDeviceConfig(packRecv);
+                            break;
+                        // 处理升级发送文件
+                        case CPackage_HJ212.CN_BIN_UPDATE:
+                            DoPackageUpdateBin(packRecv);
+                            break;
+                        case CPackage_HJ212.CN_CFG_UPDATE:
+                            DoPackageUpdateConfig(packRecv);
+                            break;
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// 升级，实际发送文件
+        /// </summary>
+        /// <param name="pack"></param>
+        private void DoPackageUpdateBin(CPackage_HJ212 pack)
+        {
+            try
+            {
+                string crc = pack.GetCPString("UCrc");
+                int pos = pack.GetCPInt32("UPos");
+                int size = pack.GetCPInt32("USize");
+
+                string file = cls_core.base_path_("cache/update/" + crc + ".bin");
+                FileInfo fi = new(file);
+
+                if (!fi.Exists)
+                {
+                    // 出现错误，版本文件不存在
+                    cls_log.get_default_().T_("", "升级错误，版本文件不存在" + crc);
+                    return;
+                }
+
+                byte[] buffer = new byte[size];
+                int read;
+                using FileStream fs = new(file, FileMode.Open, FileAccess.Read);
+
+                // 文件大小不会超过32个字节
+                if (pos < (int)fs.Length)
+                {
+                    fs.Seek(pos, SeekOrigin.Begin);
+                    read = fs.Read(buffer, 0, size);
+
+                    // 发送
+                    SendData(pack.MN, buffer, 0, read, "Buffer: " + read);
+                }
+
+                fs.Close();
+                fs.Dispose();
+            }
+            catch (Exception ex)
+            {
+                cls_log.get_default_().T_("", ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// 发送升级配置
+        /// </summary>
+        /// <param name="pack"></param>
+        private void DoPackageUpdateConfig(CPackage_HJ212 pack)
+        {
+            try
+            {
+                string crc = pack.GetCPString("UCrc");
+                string configData = DBSql.DBLoadVersionConfig(crc);
+
+                // 将通用的MN替换
+                configData = configData.Replace("@@DeviceId", pack.MN);
+
+                // 发送
+                CPackage_HJ212 packSend = new("");
+                packSend.Encode(pack.MN, "99", 
+                    CPackage_HJ212.CN_CFG_UPDATE, CPackage_HJ212.PASSWORD_DEFAULT, configData);
+
+                SendPackage(packSend);
             }
             catch (Exception ex)
             {
@@ -390,7 +620,8 @@ namespace EOIotServer.protocol
                     else
                     {
                         cls_log.get_default_().T_("", "设备未注册{0}", pack.MN);
-                        ServerHandler.close_(pack.ConnectKey, "设备未注册" + pack.MN);
+                        //ServerHandler.close_(pack.ConnectKey, "设备未注册" + pack.MN);
+                        return;
                     }
                 }
 
