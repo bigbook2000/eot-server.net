@@ -10,14 +10,27 @@ namespace cn.eobject.iot.Server.Config
     /// </summary>
     public class cls_config
     {
+        /// <summary>
+        /// 配置文件路径
+        /// </summary>
         public string _file_path = "";
+        /// <summary>
+        /// 配置根节点
+        /// </summary>
         public cls_config_obj _root = new ("_root_", "");
 
+        /// <summary>
+        /// 根节点（空节点）
+        /// </summary>
+        /// <returns></returns>
         public cls_config_obj root_()
         {
             return _root;
         }
-
+        /// <summary>
+        /// 加载一个yml文件
+        /// </summary>
+        /// <param name="filePath"></param>
         public void load_(string filePath)
         {
             string? sLine;
@@ -76,7 +89,11 @@ namespace cn.eobject.iot.Server.Config
                 cls_log.get_default_().T_("", ex.ToString());
             }
         }
-
+        /// <summary>
+        /// 写入一行配置项
+        /// </summary>
+        /// <param name="sw">文件流</param>
+        /// <param name="configObj">配置节点对象</param>
         private void write_config_(StreamWriter sw, cls_config_obj configObj)
         {
             string sLine;
@@ -98,7 +115,11 @@ namespace cn.eobject.iot.Server.Config
                 write_config_(sw, obj);
             }
         }
-
+        /// <summary>
+        /// 保存yml配置文件
+        /// 可以保留注释
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
         public void save_(string filePath)
         {
             try
@@ -130,9 +151,9 @@ namespace cn.eobject.iot.Server.Config
         }
 
         /// <summary>
-        /// 两级简化获取
+        /// 多层级获取string
         /// </summary>
-        /// <param name="keyPath"></param>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
         /// <returns></returns>
         public string get_string_(string keyPath)
         {
@@ -147,7 +168,12 @@ namespace cn.eobject.iot.Server.Config
 
             return configObj._val;
         }
-
+        /// <summary>
+        /// 设置多层级配置项string
+        /// </summary>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
+        /// <param name="val">项目值</param>
+        /// <returns></returns>
         public bool set_string_(string keyPath, string val)
         {
             string[] keyList = keyPath.Split('/');
@@ -163,7 +189,11 @@ namespace cn.eobject.iot.Server.Config
 
             return true;
         }
-
+        /// <summary>
+        /// 多层级获取int
+        /// </summary>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
+        /// <returns></returns>
         public int get_int32_(string keyPath)
         {
             if (int.TryParse(get_string_(keyPath), out var val))
@@ -173,11 +203,21 @@ namespace cn.eobject.iot.Server.Config
 
             return 0;
         }
-        public bool get_int32_(string keyPath, int val)
+        /// <summary>
+        /// 设置多层级配置项int
+        /// </summary>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
+        /// <param name="val">项目值</param>
+        /// <returns></returns>
+        public bool set_int32_(string keyPath, int val)
         {            
             return set_string_(keyPath, val.ToString());
         }
-
+        /// <summary>
+        /// 多层级获取double
+        /// </summary>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
+        /// <returns></returns>
         public double get_double_(string keyPath)
         {
             if (double.TryParse(get_string_(keyPath), out var val))
@@ -187,15 +227,21 @@ namespace cn.eobject.iot.Server.Config
 
             return 0.0;
         }
-        public bool get_double_(string keyPath, int val)
+        /// <summary>
+        /// 设置多层级配置项double
+        /// </summary>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
+        /// <param name="val">项目值</param>
+        /// <returns></returns>
+        public bool set_double_(string keyPath, int val)
         {
             return set_string_(keyPath, val.ToString());
         }
 
         /// <summary>
-        /// 获取所有子节点
+        /// 多层级获取所有子节点
         /// </summary>
-        /// <param name="keyPath"></param>
+        /// <param name="keyPath">多级节点项目名 xxx/../xxx </param>
         /// <returns></returns>
         public List<cls_config_obj> get_childs_(string keyPath)
         {

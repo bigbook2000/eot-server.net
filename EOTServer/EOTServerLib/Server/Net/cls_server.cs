@@ -7,29 +7,48 @@ using System.Net.Sockets;
 namespace cn.eobject.iot.Server.Net
 {
     /// <summary>
-    /// 服务类
+    /// 网络服务类
+    /// 主要是监听客户端连接事件，管理连接对象。连接成功之后交由cls_connect连接对象处理。
     /// </summary>
     public class cls_server
     {
         public const int MAX_BUFFER = 4096;
 
+        /// <summary>
+        /// 监听Socket
+        /// </summary>
         private Socket? _socket_server;
+        /// <summary>
+        /// 服务监听端口
+        /// </summary>
         protected int _port;
 
         //AutoResetEvent _event_accept = new AutoResetEvent(false);
 
         /// <summary>
         /// 避免内存问题
+        /// 使用IP+端口标识，快速检索
+        /// 使用锁保证线程安全
         /// </summary>
         private readonly Dictionary<string, cls_connect> _connect_map = new();
-
+        /// <summary>
+        /// 处理事件回调，通知外部应用
+        /// </summary>
         protected evt_server _event_server;
 
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="eventServer">回调事件</param>
         public cls_server(evt_server eventServer)
         {
             _event_server = eventServer;
         }
-
+        /// <summary>
+        /// 根据标识获取连接对象
+        /// </summary>
+        /// <param name="connectKey">连接对象标识，IP+端口，固定长度</param>
+        /// <returns></returns>
         public cls_connect? get_connect(string connectKey)
         {
             lock (_connect_map)
@@ -40,7 +59,10 @@ namespace cn.eobject.iot.Server.Net
 
             return null;
         }
-
+        /// <summary>
+        /// 获取连接数量
+        /// </summary>
+        /// <returns></returns>
         public int get_connect_count()
         {
             lock (_connect_map)
@@ -50,7 +72,7 @@ namespace cn.eobject.iot.Server.Net
         }
 
         /// <summary>
-        /// 复制一个列表
+        /// 复制一个列表，目的是当外部循环时线程安全，同时使用副本避免在锁内循环
         /// </summary>
         /// <returns></returns>
         public List<cls_connect> get_connect_list_()
@@ -102,6 +124,10 @@ namespace cn.eobject.iot.Server.Net
             }
         }
 
+        /// <summary>
+        /// 启动服务
+        /// </summary>
+        /// <param name="port"></param>
         public void start_(int port)
         {
             stop_();
@@ -125,7 +151,9 @@ namespace cn.eobject.iot.Server.Net
                 cls_log.get_default_().T_("", ex.ToString());
             }
         }
-
+        /// <summary>
+        /// 停止服务
+        /// </summary>
         public void stop_()
         {
             try
@@ -140,7 +168,11 @@ namespace cn.eobject.iot.Server.Net
 
             _socket_server = null;
         }
-
+        /// <summary>
+        /// 关闭指定的连接对象
+        /// </summary>
+        /// <param name="connectKey"></param>
+        /// <param name="info"></param>
         public void close_(string connectKey, string info)
         {
             try
@@ -164,7 +196,10 @@ namespace cn.eobject.iot.Server.Net
                 cls_log.get_default_().T_("", ex.ToString());
             }
         }
-
+        /// <summary>
+        /// 处理客户端连接请求
+        /// </summary>
+        /// <param name="asyncResult"></param>
         private void on_accept(IAsyncResult asyncResult)
         {
             try
@@ -206,6 +241,7 @@ namespace cn.eobject.iot.Server.Net
                 }
                 else
                 {
+                    // 发现异常，重启服务
                     start_(_port);
                 }
             }
@@ -214,7 +250,13 @@ namespace cn.eobject.iot.Server.Net
                 cls_log.get_default_().T_("", ex.ToString());
             }
         }
-
+        /// <summary>
+        /// 传递接收数据事件
+        /// 接收数据在cls_connect网络连接对象中进行，通过_event_server事件向外部应用传递，优化系统架构代码
+        /// </summary>
+        /// <param name="connect"></param>
+        /// <param name="bytes"></param>
+        /// <returns></returns>
         internal int do_recv_(cls_connect connect, byte[] bytes)
         {
             try

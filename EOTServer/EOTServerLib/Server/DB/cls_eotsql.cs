@@ -17,15 +17,53 @@ namespace cn.eobject.iot.Server.DB
     /// </summary>
     public class cls_eotsql
     {
+        /// <summary>
+        /// 由于是拼接方式，需要通过过滤来处理注入问题
+        /// 虽然不是最优解，但这是数据库兼容性最好的方式
+        /// </summary>
+        public static string[] SQL_KEYWORDS =
+        {
+            "'", "<", ">", "=", "(", ")", "!", ";"
+        };
+
+
+        /// <summary>
+        /// 避免拼接SQL注入，根据实际情况扩展
+        /// </summary>
+        /// <param name="valString"></param>
+        /// <returns></returns>
+        public static bool check_sql_value_(string valString)
+        {
+            foreach (var key in SQL_KEYWORDS)
+            {
+                if (valString.Contains(key, StringComparison.CurrentCultureIgnoreCase)) return true;
+            }
+
+            return false;
+        }
+        /// <summary>
+        /// 脚本文件路径
+        /// </summary>
         private string _path = "";
+        /// <summary>
+        /// 脚本对象表
+        /// </summary>
         public Dictionary<string, cls_eotsql_file> _dic_script = new();
 
         /// <summary>
-        /// 多数据库参数
+        /// 多数据源连接参数字符串表
         /// </summary>
         private Dictionary<string, string> _dic_db_string = new();
+        /// <summary>
+        /// 数据库类型表，派生类管理
+        /// 目前暂对mysql有效
+        /// </summary>
         private Dictionary<string, Type> _dic_db_type = new();
 
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="slowDelay">慢查询时间上限，单位秒</param>
         public cls_eotsql(long slowDelay)
         {
             cls_eotsql_db._slow_delay = slowDelay;
@@ -35,8 +73,10 @@ namespace cn.eobject.iot.Server.DB
         }
 
         /// <summary>
-        /// 数据库参数
+        /// 添加多数据源
         /// </summary>
+        /// <param name="dbName">数据源名称</param>
+        /// <param name="connStr">数据库连接参数字符串</param>
         public void add_db_(string dbName, string connStr)
         {
             if (!_dic_db_string.ContainsKey(dbName))
@@ -48,10 +88,16 @@ namespace cn.eobject.iot.Server.DB
                 _dic_db_string[dbName] = connStr;
             }
         }
-
+        /// <summary>
+        /// 访问指定的数据源对象
+        /// 暂时只支持mysql
+        /// </summary>
+        /// <param name="dbType">数据类型</param>
+        /// <param name="dbName">数据源名称</param>
+        /// <returns></returns>
         public cls_eotsql_db get_db_(string dbType, string dbName)
         {
-            string sConn = "";
+            string sConn;
             if (_dic_db_string.ContainsKey(dbName))
             {
                 sConn = _dic_db_string[dbName];
@@ -61,6 +107,8 @@ namespace cn.eobject.iot.Server.DB
                 sConn = _dic_db_string.First().Value;
             }
 
+            // 目前暂支持mysql
+            // 后续扩展
             return dbType switch
             {
                 _ => new cls_db_mysql(sConn),
@@ -70,8 +118,8 @@ namespace cn.eobject.iot.Server.DB
         /// <summary>
         /// 动态反射更优雅，效率太低
         /// </summary>
-        /// <param name="dbType"></param>
-        /// <param name="dbName"></param>
+        /// <param name="dbType">数据类型</param>
+        /// <param name="dbName">数据源名称</param>
         /// <returns></returns>
         public object? _get_db0(string dbType, string dbName)
         {
@@ -88,7 +136,7 @@ namespace cn.eobject.iot.Server.DB
             string sTypeName = dbType;
             if (tDbType.FullName != null) sTypeName = tDbType.FullName;
 
-            string sConn = "";
+            string sConn;
             if (_dic_db_string.ContainsKey(dbName))
             {
                 sConn = _dic_db_string[dbName];
@@ -109,9 +157,9 @@ namespace cn.eobject.iot.Server.DB
         }
 
         /// <summary>
-        /// 加载所有SQL语句
+        /// 加载指定路径下的数据库脚本
         /// </summary>
-        /// <param name="path"></param>
+        /// <param name="path">数据库脚本文件路径</param>
         public void load_(string path)
         {
             string? sLine;
@@ -151,7 +199,9 @@ namespace cn.eobject.iot.Server.DB
                 cls_log.get_db_().T_("", ex.ToString());
             }
         }
-
+        /// <summary>
+        /// 重新加载，动态更新
+        /// </summary>
         public void reload_()
         {
             load_(_path);
@@ -160,11 +210,13 @@ namespace cn.eobject.iot.Server.DB
         /// <summary>
         /// 分页仅用于SELECT，整个脚本只能有唯一SELECT
         /// </summary>
-        /// <param name="result"></param>
-        /// <param name="sqlObj"></param>
-        /// <param name="args"></param>
-        /// <param name="rowIndex"></param>
-        /// <param name="rowCount"></param>
+        /// <param name="result">执行结果</param>
+        /// <param name="sqlDb">数据源</param>
+        /// <param name="sqlObj">数据库脚本对象</param>
+        /// <param name="args">执行参数</param>
+        /// <param name="rowIndex">分页偏移</param>
+        /// <param name="rowCount">分页数量</param>
+        /// <returns>执行成功返回true，否则false</returns>
         private bool script_select_(cls_result result,
             cls_eotsql_db sqlDb,
             cls_eotsql_obj sqlObj,
@@ -178,11 +230,11 @@ namespace cn.eobject.iot.Server.DB
             // 如果小于0，查询总数
             if (nRowIndexQuery < 0)
             {
-                string? sqlCount = cls_eotsql_obj.get_count_(sql);
-                if (sqlCount != null)
+                string? sSqlCount = sqlDb.get_sql_count_(sql);
+                if (sSqlCount != null)
                 {
                     cls_result cQuery = new();
-                    sqlDb.exec_value_(cQuery, sqlCount);
+                    sqlDb.exec_value_(cQuery, sSqlCount);
                     // 错误中断执行
                     if (!cQuery.is_success_()) return false;
                     nRowTotal = cls_core.o2int_(cQuery.get_scalar());
@@ -193,8 +245,7 @@ namespace cn.eobject.iot.Server.DB
 
             if (rowCount > 0)
             {
-                // 语句后面不要跟;
-                sql += " limit " + nRowIndexQuery + "," + rowCount;
+                sql = sqlDb.get_sql_page_(sql, nRowIndexQuery, rowCount);
             }
 
             result.reset_();
@@ -225,11 +276,13 @@ namespace cn.eobject.iot.Server.DB
         /// <summary>
         /// 执行条件复合语句
         /// </summary>
-        /// <param name="result"></param>
-        /// <param name="sqlObj"></param>
-        /// <param name="args"></param>
-        /// <param name="rowIndex"></param>
-        /// <param name="rowCount"></param>
+        /// <param name="result">执行结果</param>
+        /// <param name="sqlDb">数据源</param>
+        /// <param name="sqlObj">数据库脚本对象</param>
+        /// <param name="args">执行参数</param>
+        /// <param name="rowIndex">分页偏移</param>
+        /// <param name="rowCount">分页数量</param>
+        /// <returns>执行成功返回true，否则false</returns>
         private bool script_iff_(cls_result result,
             cls_eotsql_db sqlDb,
             cls_eotsql_obj sqlObj,
@@ -255,11 +308,13 @@ namespace cn.eobject.iot.Server.DB
         /// <summary>
         /// 执行变量返回语句，单一SELECT
         /// </summary>
-        /// <param name="result"></param>
-        /// <param name="sqlObj"></param>
-        /// <param name="args"></param>
-        /// <param name="rowIndex"></param>
-        /// <param name="rowCount"></param>
+        /// <param name="result">执行结果</param>
+        /// <param name="sqlDb">数据源</param>
+        /// <param name="sqlObj">数据库脚本对象</param>
+        /// <param name="args">执行参数</param>
+        /// <param name="rowIndex">分页偏移（本方法保留）</param>
+        /// <param name="rowCount">分页数量（本方法保留）</param>
+        /// <returns>执行成功返回true，否则false</returns>
         private bool script_var_(cls_result result,
             cls_eotsql_db sqlDb,
             cls_eotsql_obj sqlObj,
@@ -292,6 +347,16 @@ namespace cn.eobject.iot.Server.DB
             return true;
         }
 
+        /// <summary>
+        /// 执行更新命令
+        /// </summary>
+        /// <param name="result">执行结果</param>
+        /// <param name="sqlDb">数据源</param>
+        /// <param name="sqlObj">数据库脚本对象</param>
+        /// <param name="args">执行参数</param>
+        /// <param name="rowIndex">分页偏移（本方法保留）</param>
+        /// <param name="rowCount">分页数量（本方法保留）</param>
+        /// <returns>执行成功返回true，否则false</returns>
         private bool script_update_(cls_result result,
             cls_eotsql_db sqlDb,
             cls_eotsql_obj sqlObj,
@@ -312,12 +377,13 @@ namespace cn.eobject.iot.Server.DB
         /// 插入语句，处理自增
         /// 如果不是自增，请调用 update
         /// </summary>
-        /// <param name="result"></param>
-        /// <param name="sqlObj"></param>
-        /// <param name="args"></param>
-        /// <param name="rowIndex"></param>
-        /// <param name="rowCount"></param>
-        /// <returns></returns>
+        /// <param name="result">执行结果</param>
+        /// <param name="sqlDb">数据源</param>
+        /// <param name="sqlObj">数据库脚本对象</param>
+        /// <param name="args">执行参数</param>
+        /// <param name="rowIndex">分页偏移（本方法保留）</param>
+        /// <param name="rowCount">分页数量（本方法保留）</param>
+        /// <returns>执行成功返回true，否则false</returns>
         private bool script_inc_(cls_result result,
             cls_eotsql_db sqlDb,
             cls_eotsql_obj sqlObj,
@@ -347,7 +413,16 @@ namespace cn.eobject.iot.Server.DB
             return true;
         }
 
-
+        /// <summary>
+        /// 总脚本对象执行方法
+        /// </summary>
+        /// <param name="result">执行结果</param>
+        /// <param name="sqlDb">数据源</param>
+        /// <param name="sqlObj">数据库脚本对象</param>
+        /// <param name="args">执行参数</param>
+        /// <param name="rowIndex">分页偏移（本方法保留）</param>
+        /// <param name="rowCount">分页数量（本方法保留）</param>
+        /// <returns>执行成功返回true，否则false</returns>
         private bool script_obj_(cls_result result,
             cls_eotsql_db sqlDb,
             cls_eotsql_obj sqlObj,
@@ -391,14 +466,11 @@ namespace cn.eobject.iot.Server.DB
         }
 
         /// <summary>
-        /// 
-        /// 执行脚本
-        /// 
+        /// 外部调用执行脚本
         /// </summary>
-        /// <param name="result"></param>
-        /// <param name="scriptName"></param>
-        /// <param name="args"></param>
-        /// <returns></returns>
+        /// <param name="result">执行结果</param>
+        /// <param name="scriptName">脚本名称</param>
+        /// <param name="args">执行参数</param>
         public void script_(cls_result result, string scriptName, Dictionary<string, object> args)
         {
             try
@@ -411,6 +483,23 @@ namespace cn.eobject.iot.Server.DB
                     result.set_error_(sInfo);
                     return;
                 }
+
+                // 检查特殊字符，如有需要可动态调整
+
+                string? sVal;
+                foreach (var arg in args)
+                {
+                    if (arg.Value == null) continue;
+                    sVal = arg.Value.ToString();
+                    if (sVal == null) continue;
+                    if (check_sql_value_(sVal))
+                    {
+                        sInfo = $"含有特殊字符 {scriptName} {sVal}";
+                        cls_log.get_db_().T_("", sInfo);
+                        result.set_error_(sInfo);
+                        return;
+                    }
+                }                
 
                 cls_eotsql_file scriptFile = _dic_script[scriptName];
 
@@ -434,19 +523,6 @@ namespace cn.eobject.iot.Server.DB
                 result.set_(cls_result.RESULT_EXCEPT, ex.Message);
                 cls_log.get_db_().T_("", ex.ToString());
             }
-        }
-
-        public cls_result call_query_(string procName, Dictionary<string, object> procArgs)
-        {
-            return new cls_result();
-        }
-        public cls_result call_update_(string procName, Dictionary<string, object> procArgs)
-        {
-            return new cls_result();
-        }
-        public cls_result call_value_(string procName, Dictionary<string, object> procArgs)
-        {
-            return new cls_result();
         }
     }
 }

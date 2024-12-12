@@ -9,27 +9,56 @@ using System.Xml.Linq;
 
 namespace cn.eobject.iot.Server.DB
 {
+    /// <summary>
+    /// SQL脚本文件
+    /// 可以使用use指定数据源，暂时不支持，后续扩展
+    ///  -- use mysql eotgate
+    /// </summary>
     public class cls_eotsql_file
     {
+        /// <summary>
+        /// 脚本名称
+        /// </summary>
         public string _script_name = "";
-
+        /// <summary>
+        /// 数据库类型
+        /// </summary>
         public string _db_type = "";
+        /// <summary>
+        /// 数据源名称
+        /// </summary>
         public string _db_name = "";
 
+        /// <summary>
+        /// 执行脚本根节点
+        /// </summary>
         public cls_eotsql_obj _root_sql = new();
-        
+        /// <summary>
+        /// 用于解析脚本缓存变量
+        /// </summary>
         private cls_eotsql_obj? _last_sql = null;
 
+        /// <summary>
+        /// 构造函数
+        /// </summary>
         public cls_eotsql_file()
         {
         }
+        /// <summary>
+        /// 使用脚本名构造
+        /// </summary>
+        /// <param name="name">脚本名</param>
         public cls_eotsql_file(string name)
         {
             _script_name = name;
             _last_sql = _root_sql;
         }
 
-
+        /// <summary>
+        /// 解析单行字符串
+        /// </summary>
+        /// <param name="line">字符串行</param>
+        /// <returns>成功返回true，否则false</returns>
         public bool parse_line_(string line)
         {
             // 不区分大小写，全部小写化

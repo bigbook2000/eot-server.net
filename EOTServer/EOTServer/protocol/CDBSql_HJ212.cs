@@ -39,12 +39,13 @@ namespace EOIotServer.protocol
         {
             Dictionary<string, int> dic = new();
 
+            // 使用##lstr##
             try
             {
                 cls_result queryResult = new();
                 script_(queryResult, "db_load_device_ids", new()
                 {
-                    { "v_mns", mns },
+                    { "##lstr##v_mns", mns },
                 });
 
                 foreach (cls_result_obj obj in queryResult._list)
@@ -68,12 +69,13 @@ namespace EOIotServer.protocol
         /// <returns></returns>
         public void DBDataRtInit(string mns)
         {
+            // 使用##lstr##
             try
             {
                 cls_result queryResult = new();
                 script_(queryResult, "db_data_rt_insert", new()
                 {
-                    { "v_mns", mns },
+                    { "##lstr##v_mns", mns },
                 });
             }
             catch (Exception ex)

@@ -15,13 +15,9 @@ namespace cn.eobject.iot.Server.DB
     /// </summary>
     public class cls_eotsql_obj_ext
     {
-        public static string[] SQL_KEYWORDS =
-{
-            "<", ">", "=", "(", ")", ";", "!",
-            "or", "and",
-            "update", "insert", "delete", "create", "drop", "alter", "truncate"
-        };
-
+        /// <summary>
+        /// IF 逻辑判断运算符
+        /// </summary>
         public const int IF_NONE = 0;
         /// <summary>
         /// =0
@@ -52,75 +48,90 @@ namespace cn.eobject.iot.Server.DB
         /// </summary>
         public const int IF_FOR = 90;
 
-
+        /// <summary>
+        /// IF 条件值，目前只支持数字和字符串
+        /// </summary>
         public const int IF_TYPE_NONE = 0;
+        /// <summary>
+        /// IF 数字值
+        /// </summary>
         public const int IF_TYPE_NUMBER = 1;
+        /// <summary>
+        /// IF 字符串值
+        /// </summary>
         public const int IF_TYPE_STRING = 2;
 
-
+        /// <summary>
+        /// 拼接参数
+        /// </summary>
         public List<string> _ext_params = new();
+        /// <summary>
+        /// IF 运算符
+        /// </summary>
         public int _ext_flag = IF_NONE;
         /// <summary>
+        /// IF 运算值类型
         /// 分开处理，主要是为了效率，放弃更为优雅的扩展方式
         /// </summary>
         public int _ext_type = IF_TYPE_NONE;
+        /// <summary>
+        /// 如果是 IF_TYPE_STRING 取该值
+        /// </summary>
         public string _ext_string = "";
+        /// <summary>
+        /// 如果是 IF_TYPE_NUMBER 取该值
+        /// </summary>
         public decimal _ext_number = 0;
 
+        /// <summary>
+        /// 语句缓存
+        /// </summary>
         public StringBuilder _string_sql = new();
-
-        private string _string_params = "";
-
+        /// <summary>
+        /// 拼接名称
+        /// </summary>
+        private string _ext_name = "";
 
         /// <summary>
-        /// 避免拼接SQL注入，根据实际情况扩展
+        /// 将语句中的参数标记替换为执行值
         /// </summary>
-        /// <param name="valString"></param>
-        /// <returns></returns>
-        public static string check_sql_value_(string valString)
+        /// <param name="sb">sql 语句字符串</param>
+        /// <param name="args">语句执行参数值</param>
+        public static void update_value_(StringBuilder sb, Dictionary<string, object> args)
         {
-            foreach (var key in SQL_KEYWORDS)
-            {
-                //if (valString.Contains(key)) return key;
-                // 加入干扰代码
-                valString = valString.Replace(key, "&#" + key + "&#");
-            }
-
-            return "";
-        }
-
-        public static string get_sql_value_(string valString)
-        {
-            return valString.Replace("&#", "");
-        }
-
-        /// <summary>
-        /// 替换参数
-        /// </summary>
-        public static string update_value_(StringBuilder sb, Dictionary<string, object> args)
-        {
-            string sInfo = "";
             // 替换值
+            string sKey;
             string? sVal;
             foreach (var arg in args)
             {
+                sKey = arg.Key;
+
                 sVal = arg.Value.ToString();
                 sVal ??= "";
 
-                if (check_sql_value_(sVal) != "")
+                // 处理特殊值
+                if (sKey[0] == '#' && sKey.Length > 8)
                 {
-                    sInfo = "无法输入 " + arg.Key + " -> " + sVal;
-                    cls_log.get_db_().T_("", sInfo);
+                    switch (sKey[..8])
+                    {
+                        case "##lstr##":
+                            sVal = "'" + sVal.Replace(",", "','") + "'";
+                            break;
+                        default:
+                            break;
+                    }
+
+                    sKey = sKey[8..];
                 }
-                else
-                {
-                    sb.Replace("#" + arg.Key, sVal);
-                }
+
+                sb.Replace("#" + sKey, sVal);
             }
-
-            return sInfo;
         }
-
+        /// <summary>
+        /// 将字符串标识转换为数字标识，便于快速比对
+        /// </summary>
+        /// <param name="s">字符串标识</param>
+        /// <returns>数字标识</returns>
         public static int get_if_flag(string s)
         {
             return (s switch
@@ -148,11 +159,12 @@ namespace cn.eobject.iot.Server.DB
         }
 
         /// <summary>
+        /// 解析脚本中定义的参数变量
         /// -- inc #v_data_field_id
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="log"></param>
-        /// <param name="args"></param>
+        /// <param name="name">脚本名称</param>
+        /// <param name="log">用户日志</param>
+        /// <param name="args">语句执行参数值</param>
         public void var_params_(string name, string log, string[] args, int pos, int len)
         {            
             if (len <= 0)
@@ -177,18 +189,19 @@ namespace cn.eobject.iot.Server.DB
                 sVal = sVal[1..];
 
                 _ext_params.Add(sVal);
-                _string_params += sVal;
+                _ext_name += sVal;
             }
 
             _string_sql.Clear();
         }
 
         /// <summary>
+        /// 解析脚本中定义的 iff 条件逻辑运算
         /// 参数 -- iff > 0 #var1 #var2 ... #varN
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="log"></param>
-        /// <param name="args"></param>
+        /// <param name="name">脚本名称</param>
+        /// <param name="log">用户日志</param>
+        /// <param name="args">语句执行参数值</param>
         public void ext_params_(string name, string log, string[] args)
         {
             if (_ext_flag != IF_NONE)
@@ -232,13 +245,22 @@ namespace cn.eobject.iot.Server.DB
 
             var_params_(name, log, args, 4, -1);
         }
-        
+
+        /// <summary>
+        /// 标记一个拼接语句，使用 $_ext_name$ 占位
+        /// </summary>
+        /// <param name="sb">SQL字符串语句</param>
         public void set_ext_string_(StringBuilder sb)
         {
-            sb.Append(' ').Append('$').Append(_string_params).Append('$');
+            sb.Append(' ').Append('$').Append(_ext_name).Append('$');
         }
 
-        public bool check_if_number_(Dictionary<string, object> args)
+        /// <summary>
+        /// 判断数字值类型变量是否满足条件
+        /// </summary>
+        /// <param name="args">语句执行参数值</param>
+        /// <returns>如果条件符合true，否则false</returns>
+        private bool check_if_number_(Dictionary<string, object> args)
         {
             foreach (var p in _ext_params)
             {
@@ -267,7 +289,13 @@ namespace cn.eobject.iot.Server.DB
 
             return false;
         }
-        public bool check_if_string_(Dictionary<string, object> args)
+
+        /// <summary>
+        /// 判断字符串类型变量是否满足条件
+        /// </summary>
+        /// <param name="args">语句执行参数值</param>
+        /// <returns>如果条件符合true，否则false</returns>
+        private bool check_if_string_(Dictionary<string, object> args)
         {
             foreach (var p in _ext_params)
             {
@@ -289,10 +317,10 @@ namespace cn.eobject.iot.Server.DB
             return false;
         }
         /// <summary>
-        /// 判断参数是否成立
+        /// 判断iff 条件参数是否成立
         /// </summary>
-        /// <param name="args"></param>
-        /// <returns></returns>
+        /// <param name="args">语句执行参数值</param>
+        /// <returns>如果条件符合true，否则false</returns>
         public bool check_if_params_(Dictionary<string, object> args)
         {
             if (_ext_type == IF_TYPE_NUMBER)
@@ -309,7 +337,14 @@ namespace cn.eobject.iot.Server.DB
                 return false;
             }
         }
-
+        /// <summary>
+        /// 处理for 循环拼接语句
+        /// 第3个参数为 for 循环分割字符串
+        /// 第4个参数为执行参数名称
+        /// -- add for ',' #v_pack
+        /// </summary>
+        /// <param name="sb">SQL字符串语句</param>
+        /// <param name="args">语句执行参数值</param>
         public void check_for_params_(StringBuilder sb, Dictionary<string, object> args)
         {
             if (_ext_params.Count == 0)
@@ -340,9 +375,14 @@ namespace cn.eobject.iot.Server.DB
             // 去掉末尾的分割
             sbFor.Remove(sbFor.Length - _ext_string.Length, _ext_string.Length);
 
-            sb.Replace('$' + _string_params + '$', sbFor.ToString());
+            sb.Replace('$' + _ext_name + '$', sbFor.ToString());
         }
 
+        /// <summary>
+        /// 替换 -- add 拼接语句
+        /// </summary>
+        /// <param name="sb">SQL字符串语句</param>
+        /// <param name="args">语句执行参数值</param>
         public void update_ext_(StringBuilder sb, Dictionary<string, object> args)
         {
             if (_ext_flag == IF_FOR)
@@ -354,11 +394,11 @@ namespace cn.eobject.iot.Server.DB
                 bool bReplace = check_if_params_(args);
                 if (bReplace)
                 {
-                    sb.Replace('$' + _string_params + '$', _string_sql.ToString());
+                    sb.Replace('$' + _ext_name + '$', _string_sql.ToString());
                 }
                 else
                 {
-                    sb.Replace('$' + _string_params + '$', "");
+                    sb.Replace('$' + _ext_name + '$', "");
                 }
             }
         }

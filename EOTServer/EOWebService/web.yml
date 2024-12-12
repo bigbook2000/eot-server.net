@@ -30,5 +30,4 @@ dbproclist:
   np_dversion_list: none
   np_dversion_upd: none
   np_dversion_del: none
-  np_dversion_file: none
   np_dversion_config: none

@@ -1,15 +1,23 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using cn.eobject.iot.Server.Core;
 
 namespace cn.eobject.iot.Server.Log
 {
+    /// <summary>
+    /// 日志处理核心对象
+    /// </summary>
     public class cls_log_obj
     {
         /// <summary>
-        /// 防止文件冲突锁
+        /// 日志文件表
+        /// 该表存储了当前使用的日志文件，以文件名为索引。
+        /// 暂时只进不出，后期再增加管理。
+        /// 由于是多线程，对该表的访问需要加锁lock
+        /// 
         /// </summary>
         protected Dictionary<string, cls_log_file> _dic_log_files = new();
 
@@ -27,6 +35,13 @@ namespace cn.eobject.iot.Server.Log
         /// </summary>
         public int _date_count = 0;
 
+        /// <summary>
+        /// 构造函数，构造一个日志对象
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="prefix"></param>
+        /// <param name="logType"></param>
+        /// <param name="dateCount"></param>
         public cls_log_obj(string name, string prefix, em_log_type logType, int dateCount)
         {
             _name = name;
@@ -35,13 +50,21 @@ namespace cn.eobject.iot.Server.Log
             _date_count = dateCount;
         }
 
+        /// <summary>
+        /// 日志函数带格式化，如果日志内容中包含{}格式符，则会出现报错。
+        /// 可以手动调用此方法替换转义字符，避免日志输出错误。
+        /// </summary>
+        /// <param name="s">格式化字符串</param>
+        /// <returns></returns>
         public static string fixed_(string s)
         {
             return s.Replace("{", "{{").Replace("}", "}}");
         }
 
         /// <summary>
-        /// 只能在此对象中调用，指示的堆栈为该方法上两级
+        /// 格式化对齐日志，目的是使得日志看起来更清晰，对于运维调试非常重要，在一大堆杂乱的信息中快速查找自己需要的内容。
+        /// 包含了时间、线程、代码文件、所在行
+        /// 只能在此对象中调用，指示的堆栈为该方法上两级。
         /// </summary>
         /// <param name="timeString"></param>
         /// <param name="format"></param>
@@ -49,10 +72,24 @@ namespace cn.eobject.iot.Server.Log
         /// <returns></returns>
         private string get_log_string_(string timeString, string format, params object[] args)
         {
+            string sMsg = "";
+
+            // 日志作为核心避免崩溃，即使出错，也要返回
+            try
+            {
+                sMsg = string.Format(format, args);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+#if DEBUG
+                Debug.WriteLine(ex.ToString());
+#endif
+                sMsg = format + " | " + ex.ToString();
+            }
+
             try
             {                
-                string sMsg = string.Format(format, args);
-
                 string sClass = "XXXXXX";
                 string sNum = "_____";
                 string sThread = Environment.CurrentManagedThreadId.ToString().PadRight(6, '_');
@@ -102,21 +139,35 @@ namespace cn.eobject.iot.Server.Log
             }
         }
 
+        /// <summary>
+        /// 获取指定的日志文件。
+        /// 根据规则返回日志文件的文件名，并检查路径是否有效
+        /// </summary>
+        /// <param name="objectName">日志对象名</param>
+        /// <param name="dateString">时间字符串</param>
+        /// <returns></returns>
         private string get_log_file_(string objectName, string dateString)
         {
-            string sPath = cls_core.base_path_() + "/logs/" + dateString;
+            string sPath = cls_core.base_path_() + "/logs/" + dateString[..10];
 
             if (!Directory.Exists(sPath))
             {
                 Directory.CreateDirectory(sPath);
             }
 
-            if (_type != em_log_type.Object)
-                return sPath + "/" + _prefix + ".txt";
-
-            return sPath + "/" + _prefix + objectName + ".txt";
+            return _type switch
+            {
+                em_log_type.Object => sPath + "/" + _prefix + objectName + ".txt",
+                em_log_type.Hour => sPath + "/" + _prefix + "_" + dateString[11..13] + ".txt",
+                _ => sPath + "/" + _prefix + ".txt",
+            };
         }
 
+        /// <summary>
+        /// 写日志文件
+        /// </summary>
+        /// <param name="filePath">日志文件名</param>
+        /// <param name="logString">日志内容</param>
         private void write_log_file_(string filePath, string logString)
         {
             cls_log_file logFile;
@@ -137,7 +188,9 @@ namespace cn.eobject.iot.Server.Log
                     }
                 }
 
-                logFile.write_log_file_(filePath, logString);
+                // 写文件有单独的锁，不需要放在文件表锁中
+                // 这样避免双重锁带来的风险，而且不会影响日志输出。
+                logFile.write_log_file_(logString);
             }
             catch (Exception ex)
             {
@@ -158,15 +211,15 @@ namespace cn.eobject.iot.Server.Log
         {
             try
             {
-                string nowString = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                string filePath = get_log_file_(objectName, nowString.Substring(0, 10));
-                string logString = get_log_string_(nowString[11..], format, args);
+                string sNow = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                string sFile = get_log_file_(objectName, sNow);
+                string sLog = get_log_string_(sNow[11..], format, args);
 
-                Console.WriteLine(logString);
+                Console.WriteLine(sLog);
 #if DEBUG
-                Debug.WriteLine(logString);
+                Debug.WriteLine(sLog);
 #endif
-                write_log_file_(filePath, logString);
+                write_log_file_(sFile, sLog);
             }
             catch (Exception ex)
             {
@@ -187,11 +240,11 @@ namespace cn.eobject.iot.Server.Log
         {
             try
             {
-                string nowString = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                string filePath = get_log_file_(objectName, nowString.Substring(0, 10));
-                string logString = get_log_string_(nowString.Substring(11), format, args);
+                string sNow = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                string sFile = get_log_file_(objectName, sNow);
+                string sLog = get_log_string_(sNow[11..], format, args);
 
-                write_log_file_(filePath, logString);
+                write_log_file_(sFile, sLog);
             }
             catch (Exception ex)
             {
@@ -214,7 +267,7 @@ namespace cn.eobject.iot.Server.Log
             try
             {
                 string sNow = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                string sLog = get_log_string_(sNow.Substring(11), format, args);
+                string sLog = get_log_string_(sNow[11..], format, args);
 
                 Console.WriteLine(sLog);
 #if DEBUG

@@ -29,6 +29,8 @@ namespace WAIotServer
             // 创建会话管理
             _ = new eow_session();
 
+            // 处理 CORS
+            // app.UseCors("CORS");
             builder.Services.AddCors(
                 options => options.AddPolicy(
                     "CORS",
@@ -56,6 +58,7 @@ namespace WAIotServer
             app.UseAuthorization();
             app.UseCors("CORS");
 
+            // 添加对wwwroot静态文件支撑
             app.UseStaticFiles();
 
             app.MapControllers();

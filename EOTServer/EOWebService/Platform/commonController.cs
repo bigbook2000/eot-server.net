@@ -256,35 +256,6 @@ namespace WAIotServer.Platfrom
         public JsonResult proc(cls_result args)
         {
             cls_result cResult = new();
-            
-            try
-            {
-                cls_result_obj data = args.default_();
-
-                string procName = data.to_string_("name");
-                if (!CheckDBPermit(cResult, procName))
-                {
-                    return new JsonResult(cResult);
-                }
-
-                Dictionary<string, object> procArgs = GetDBArgs(data);
-
-                cResult = CGlobal.DBScript.call_query_(procName, procArgs);
-            }
-            catch (Exception ex)
-            {
-                cResult.set_except_(ex);
-                cls_log.get_default_().T_("", ex.ToString());
-            }
-
-            return new JsonResult(cResult);
-        }
-
-        [HttpPost]
-        [Route("query")]
-        public JsonResult query(cls_result args)
-        {
-            cls_result cResult = new();
 
             try
             {

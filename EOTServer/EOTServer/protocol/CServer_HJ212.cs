@@ -568,7 +568,7 @@ namespace EOIotServer.protocol
                     if (pack.DeviceId <= 0)
                     {
                         listRegister.Add(pack);
-                        sb.Append('\'').Append(pack.MN).Append('\'').Append(',');
+                        sb.Append(pack.MN).Append(',');
                     }
                 }
 

@@ -310,7 +310,7 @@ namespace WAIotServer.Platfrom
                 loginPswOld = CGlobal.EncryptPassword(loginPswOld, loginId, false);
                 loginPswNew = CGlobal.EncryptPassword(loginPswNew, loginId, false);
 
-                cResult = CGlobal.DBScript.call_query_("eopx_user_password", new()
+                CGlobal.DBScript.script_(cResult, "eopx_user_password", new()
                 {
                     { "v_user_id", userId },
                     { "v_login_psw_old", loginPswOld },
@@ -352,7 +352,7 @@ namespace WAIotServer.Platfrom
 
                 string loginPswNew = CGlobal.EncryptPassword(CGlobal.DefaultPassword, loginId, false);
 
-                cResult = CGlobal.DBScript.call_query_("eopx_user_password", new()
+                CGlobal.DBScript.script_(cResult, "eopx_user_password", new()
                 {
                     { "v_user_id", userId },
                     { "v_login_psw_old", "" },

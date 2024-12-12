@@ -8,21 +8,39 @@ using System.Threading.Tasks;
 
 namespace cn.eobject.iot.Server.Net
 {
+    /// <summary>
+    /// 缓存对象
+    /// 用来处理网络字节流或者管理内存，该对象使用了一个先进先出FIFO的方式。
+    /// 具有线程安全性。
+    /// 固定长度的缓存，之所以不自动增加，避免由于逻辑错误造成内存消耗过大，正常情况下我们设计的负载能力和网络包的大小是可预知的。
+    /// </summary>
     public class cls_buffer
     {
         /// <summary>
         /// 使用一个只读对象锁
         /// </summary>
         private readonly object _lock_flag = new();
-            
+        /// <summary>
+        /// 字节流缓存
+        /// </summary>
         protected byte[] _buffer;
+        /// <summary>
+        /// 字节流长度
+        /// </summary>
         protected int _length;
 
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="bufferMax">固定长度</param>
         public cls_buffer(int bufferMax) 
         {
             _buffer = new byte[bufferMax];
         }
-
+        /// <summary>
+        /// 获取长度
+        /// </summary>
+        /// <returns></returns>
         public int get_length_() 
         {
             lock (_lock_flag)
@@ -31,12 +49,21 @@ namespace cn.eobject.iot.Server.Net
             }
         }
 
+        public void clear_()
+        {
+            lock (_lock_flag)
+            {
+                _length = 0;
+            }
+        }
+
         /// <summary>
-        /// 缓存数据
+        /// 缓存数据，如果插入的数据过多，则全部清除。
+        /// 长度固定，如果超出则表示逻辑出现异常。
         /// </summary>
-        /// <param name="bytes"></param>
-        /// <param name="offset"></param>
-        /// <param name="length"></param>
+        /// <param name="bytes">源字节流数据</param>
+        /// <param name="offset">偏移量</param>
+        /// <param name="length">长度</param>
         /// <returns></returns>
         public int push_(byte[] bytes, int offset, int length)
         {
@@ -63,15 +90,15 @@ namespace cn.eobject.iot.Server.Net
         /// <summary>
         /// 取出数据
         /// </summary>
-        /// <param name="bytes"></param>
-        /// <param name="offset"></param>
-        /// <param name="length"></param>
+        /// <param name="bytes">目标字节流数据</param>
+        /// <param name="offset">偏移量</param>
+        /// <param name="length">长度</param>
         /// <returns></returns>
         public int pop_(byte[] bytes, int offset, int length)
         {
             lock (_lock_flag)
             {
-                // 如果超出范围，全部拷贝
+                // 如果超出范围，全部拷贝（截断）
                 if (length < 0 || length > _length) length = _length;
 
                 // 从0开始
@@ -83,7 +110,11 @@ namespace cn.eobject.iot.Server.Net
 
             return length;
         }
-
+        /// <summary>
+        /// 移除指定长度的数据
+        /// </summary>
+        /// <param name="length"></param>
+        /// <returns></returns>
         public int pop_(int length)
         {
             if (length <= 0) return _length;

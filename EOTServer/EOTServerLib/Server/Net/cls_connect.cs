@@ -8,6 +8,11 @@ using System.Security.Principal;
 
 namespace cn.eobject.iot.Server.Net
 {
+    /// <summary>
+    /// 客户端连接对象
+    /// 每个网络终端对应一个连接对象，发送和接收都采用异步IO模型，提高并发承载能力。
+    /// 由系统处理网络接收，完成之后通知应用进行下一步操作。
+    /// </summary>
     public class cls_connect
     {
         /// <summary>
@@ -15,15 +20,35 @@ namespace cn.eobject.iot.Server.Net
         /// </summary>
         private const int POP_PACK_MAX = 8;
 
+        /// <summary>
+        /// 服务器对象
+        /// </summary>
         private cls_server? _server;
+        /// <summary>
+        /// Socket对象
+        /// </summary>
         private Socket? _socket;
-
+        /// <summary>
+        /// Socket网络接收地址（实际）
+        /// </summary>
         private byte[] _recv_bytes;
+        /// <summary>
+        /// Socket网络发送地址（实际）
+        /// </summary>
         private byte[] _send_bytes;
 
+        /// <summary>
+        /// 逻辑接收缓存，由于TCP协议存在分包粘包现象，通过首尾相接的逻辑缓存保证协议的完整性。
+        /// </summary>
         private cls_buffer _buffer_recv;
+        /// <summary>
+        /// 逻辑发送缓存，将逻辑应用和网络分开，使用发送缓存避免阻塞，提高并发效率。
+        /// </summary>
         private cls_buffer _buffer_send;
 
+        /// <summary>
+        /// 连接对象标识，使用IP+端口，固定长度
+        /// </summary>
         protected string _key = "_";
 
         /// <summary>
@@ -36,11 +61,21 @@ namespace cn.eobject.iot.Server.Net
         /// </summary>
         protected long _last_tick = 0L;
 
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="server">父节点</param>
+        /// <param name="key">连接对象标识，使用IP+端口，固定长度</param>
+        /// <param name="bufferRecvMax">接收缓存大小</param>
+        /// <param name="bufferSendMax">发送缓存大小</param>
         public cls_connect(cls_server server, string key, int bufferRecvMax, int bufferSendMax)
         {
             _server = server;
 
             _key = key;
+
+            // 正常情况下我们应将逻辑缓存设计的更大，但这会带来内存的消耗。
+            // 这里使用相同的大小，简化设计。
 
             _recv_bytes = new byte[bufferRecvMax];
             _send_bytes = new byte[bufferSendMax];
@@ -49,6 +84,10 @@ namespace cn.eobject.iot.Server.Net
             _buffer_send = new(bufferSendMax);
         }
 
+        /// <summary>
+        /// 获取连接标识
+        /// </summary>
+        /// <returns></returns>
         public string get_key_()
         {
             return _key;
@@ -63,6 +102,10 @@ namespace cn.eobject.iot.Server.Net
             return _start_time;
         }
 
+        /// <summary>
+        /// 获取逻辑接收缓存长度
+        /// </summary>
+        /// <returns></returns>
         public int get_recv_length()
         {
             return _buffer_recv.get_length_();
@@ -78,9 +121,15 @@ namespace cn.eobject.iot.Server.Net
             return (tick - _last_tick) > timeout;
         }
 
+        /// <summary>
+        /// 处理监听连接
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <returns></returns>
         internal int do_accept_(Socket socket)
         {
             // 仅关闭，不清除
+            // 防御性代码，初始化
             do_close_(null);
 
             try
@@ -129,7 +178,12 @@ namespace cn.eobject.iot.Server.Net
                 _server = null;
             }
         }
-
+        /// <summary>
+        /// 向客户端发送数据，这里并不实际调用网络发送函数，仅仅将数据插入到逻辑缓存中，由专门的线程来调度实际发送，提高并发能力
+        /// </summary>
+        /// <param name="bytes"></param>
+        /// <param name="offset"></param>
+        /// <param name="length"></param>
         public void send_(byte[] bytes, int offset, int length)
         {
             try
@@ -144,7 +198,9 @@ namespace cn.eobject.iot.Server.Net
 
             do_send();
         }
-
+        /// <summary>
+        /// 处理接收数据
+        /// </summary>
         protected void do_recv()
         {
             try
@@ -161,7 +217,9 @@ namespace cn.eobject.iot.Server.Net
                 _server?.close_(_key, ex.Message);
             }
         }
-
+        /// <summary>
+        /// 实际发送数据
+        /// </summary>
         protected void do_send()
         {
             try
@@ -190,7 +248,10 @@ namespace cn.eobject.iot.Server.Net
                 _server?.close_(_key, ex.Message);
             }
         }
-
+        /// <summary>
+        /// 当网络发送数据完成后回调
+        /// </summary>
+        /// <param name="result"></param>
         protected void on_send(IAsyncResult result)
         {
             try
@@ -234,7 +295,10 @@ namespace cn.eobject.iot.Server.Net
                 _server?.close_(_key, ex.Message);
             }
         }
-
+        /// <summary>
+        /// 当网络接收数据后回调
+        /// </summary>
+        /// <param name="result"></param>
         protected void on_recv(IAsyncResult result)
         {
             try

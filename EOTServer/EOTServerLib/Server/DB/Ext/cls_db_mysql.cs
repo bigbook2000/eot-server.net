@@ -11,8 +11,14 @@ using System.Threading.Tasks;
 
 namespace cn.eobject.iot.Server.DB.Ext
 {
+    /// <summary>
+    /// mysql数据库接口
+    /// </summary>
     public class cls_db_mysql : cls_eotsql_db
     {
+        /// <summary>
+        /// 数据库连接对象
+        /// </summary>
         protected MySqlConnection? _connection;
 
         public cls_db_mysql(string db) : base(db)
@@ -47,6 +53,35 @@ namespace cn.eobject.iot.Server.DB.Ext
             {
                 cls_log.get_db_().T_("", ex.ToString());
             }
+        }
+
+        public override string get_sql_count_(string sql)
+        {
+            sql = sql.Trim();
+            if (!sql.StartsWith("select", StringComparison.CurrentCultureIgnoreCase))
+            {
+                cls_log.get_db_().T_("", "分页仅支持单一语句\r\n{0}", sql);
+                return sql;
+            }
+
+            int p2 = sql.IndexOf("from", StringComparison.CurrentCultureIgnoreCase);
+            if (p2 < 0)
+            {
+                cls_log.get_db_().T_("", "分页语句错误\r\n{0}", sql);
+                return sql;
+            }
+
+            sql = "select count(*) " + sql[p2..];
+
+            return sql;
+        }
+
+        public override string get_sql_page_(string sql, int rowIndex, int rowCount)
+        {
+            // 语句后面不要跟;
+            sql += " limit " + rowIndex + "," + rowCount;
+
+            return sql;
         }
 
         protected override void exec_value_inner_(cls_result result, string sql)

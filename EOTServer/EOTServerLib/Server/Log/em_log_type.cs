@@ -1,10 +1,14 @@
 ﻿namespace cn.eobject.iot.Server.Log
 {
     /// <summary>
+    /// 日志类型
     /// 日志均为每天单独的目录
     /// </summary>
     public enum em_log_type
     {
+        /// <summary>
+        /// 未定义
+        /// </summary>
         None = 0,
         /// <summary>
         /// 每天放在一个文件中
