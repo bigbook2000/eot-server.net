@@ -7,11 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EOTServerLib\EOTServerLib.csproj" />
+    <Compile Remove="protocol\hj212\json\**" />
+    <EmbeddedResource Remove="protocol\hj212\json\**" />
+    <None Remove="protocol\hj212\json\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="protocol\hj212\json\" />
+    <ProjectReference Include="..\EOTServerLib\EOTServerLib.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +34,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="sql\db_load_device_config.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sql\db_load_device_configs.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="sql\db_load_device_ids.sql">

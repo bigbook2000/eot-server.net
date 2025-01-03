@@ -81,10 +81,6 @@ namespace cn.eobject.iot.Server.Log
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
-#if DEBUG
-                Debug.WriteLine(ex.ToString());
-#endif
                 sMsg = format + " | " + ex.ToString();
             }
 

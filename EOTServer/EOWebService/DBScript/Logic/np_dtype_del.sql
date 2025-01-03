@@ -1,12 +1,12 @@
 ﻿
 ---- 先删除版本
 -- set
-update n_dversion set _update_flag=-1 where f_type_id = #v_type_id;
+update n_dversion set _update_flag=-1 where f_dtype_id = #v_dtype_id;
 -- end
 
 -- set
-update n_dtype set _update_flag=-1 where f_type_id = #v_type_id;
+update n_dtype set _update_flag=-1 where f_dtype_id = #v_dtype_id;
 -- end
 -- set
-select 0 as _d, '' as _s, #v_type_id as f_type_id;
+select 0 as _d, '' as _s, #v_dtype_id as f_dtype_id;
 -- end

@@ -51,10 +51,6 @@ namespace EOIotServer.protocol.hj212
         /// 固件更新
         /// </summary>
         public const string CN_BIN_UPDATE = "3111";
-        /// <summary>
-        /// 固件更新
-        /// </summary>
-        public const string CN_CFG_UPDATE = "3112";
 
         public int DeviceId = 0;
 

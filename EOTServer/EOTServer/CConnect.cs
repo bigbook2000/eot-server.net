@@ -20,6 +20,11 @@ namespace EOIotServer
         /// </summary>
         public string ConnectMN = "";
 
+        /// <summary>
+        /// 配置参数（拆分）
+        /// </summary>
+        public string AppSetting = "";
+
         public CConnect(cls_server server, string connectKey, int bufferRecvMax, int bufferSendMax) : 
             base(server, connectKey, bufferRecvMax, bufferSendMax)
         {

@@ -78,7 +78,6 @@ namespace WAIotServer.Controllers
 
         /// <summary>
         /// 版本升级
-        /// 
         /// </summary>
         /// <param name="args"></param>
         /// <returns></returns>
@@ -94,6 +93,8 @@ namespace WAIotServer.Controllers
                 cResult.add_(data);
 
                 // 设备标识
+                // 如果total为0，则仅仅更新配置，复制当前版本
+
                 string sMN = data.to_string_("mn");
                 string sType = data.to_string_("type");
                 string sVersion = data.to_string_("version");

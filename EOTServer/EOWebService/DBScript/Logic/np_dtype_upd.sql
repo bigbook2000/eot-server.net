@@ -1,14 +1,14 @@
 ﻿
--- iff > 0 #v_type_id
+-- iff > 0 #v_dtype_id
 	-- set
 	update n_dtype set 
 		f_dtype = '#v_dtype',
         f_note = '#v_note'
-		where f_type_id = #v_type_id;
+		where f_dtype_id = #v_dtype_id;
 	-- end
 -- end
--- iff <= 0 #v_type_id
-	-- inc #v_type_id
+-- iff <= 0 #v_dtype_id
+	-- inc #v_dtype_id
 	insert into n_dtype(
 		f_dtype,
         f_note, 
