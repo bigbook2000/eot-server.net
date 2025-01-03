@@ -21,9 +21,11 @@ eot-server.net分为两大模块，EOTServer采用C/S架构，TCP Server为物�
 #### 使用说明
 代码使用Microsoft Visual Studio Community 2022 (64 位) 个人社区版本（免费）直接打开，无需下载依赖任何第三方库。
 
-数据库使用Oracle MySQL Community Server（开源免费）8.0，推荐官方免费的MySQL Workbench可视化工具，直接导入db/eotgate.sql脚本。
+数据库使用Oracle MySQL Community Server（开源免费）8.0，推荐官方免费的MySQL Workbench可视化工具，直接导入db/eotgate.sql脚本。本系统提供了独立的SQL语句执行系统，不再使用存储过程，避免过多依赖于数据库，可更好的进行多数据库迁移。
 
 为了和终端兼容，并扩展方便，采用了yml配置文件格式。平台一共使用两个配置文件server.yml和web.yml分别对应C/S模块和B/S模块。
+
+完善扩展了HJ212协议，可通过HJ212进行终端固件版本升级，预留了版本回滚机制，采用Base64可见字符传输二进制版本文件，很好的兼容了HJ212协议。
 
 
 #### 参与贡献
